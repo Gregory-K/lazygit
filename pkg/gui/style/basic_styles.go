@@ -16,7 +16,7 @@ var (
 	FgGreen        = FromBasicFg(color.FgGreen)
 	FgBlue         = FromBasicFg(color.FgBlue)
 	FgYellow       = FromBasicFg(color.FgYellow)
-	FgMagenta      = FromBasicFg(color.FgMagenta)
+	FgMagenta      = FromBasicFg(color.FgCyan)  // pwsh DarkMagenta
 	FgDefault      = FromBasicFg(color.FgDefault)
 
 	BgWhite   = FromBasicBg(color.BgWhite)
@@ -45,7 +45,7 @@ var (
 		"green":   {FgGreen, BgGreen},
 		"yellow":  {FgYellow, BgYellow},
 		"blue":    {FgBlue, BgBlue},
-		"magenta": {FgMagenta, BgMagenta},
+		"magenta": {FgCyan, BgMagenta},
 		"cyan":    {FgCyan, BgCyan},
 		"white":   {FgWhite, BgWhite},
 	}
