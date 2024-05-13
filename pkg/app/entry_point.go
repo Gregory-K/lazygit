@@ -18,7 +18,7 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/env"
 	integrationTypes "github.com/jesseduffield/lazygit/pkg/integration/types"
 	"github.com/jesseduffield/lazygit/pkg/logs/tail"
-	"github.com/jesseduffield/lazygit/pkg/utils"
+	// "github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/samber/lo"
 	"gopkg.in/yaml.v3"
 )
@@ -263,7 +263,8 @@ func mergeBuildInfo(buildInfo *BuildInfo) {
 		buildInfo.Commit = revision.Value
 		// if lazygit was built from source we'll show the version as the
 		// abbreviated commit hash
-		buildInfo.Version = utils.ShortHash(revision.Value)
+		// buildInfo.Version = utils.ShortHash(revision.Value)
+		buildInfo.Version = "dm_0.41.0~"
 	}
 
 	// if version hasn't been set we assume that neither has the date
