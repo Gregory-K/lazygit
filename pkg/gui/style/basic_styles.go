@@ -16,7 +16,7 @@ var (
 	FgGreen        = FromBasicFg(color.FgGreen)
 	FgBlue         = FromBasicFg(color.FgBlue)
 	FgYellow       = FromBasicFg(color.FgYellow)
-	FgMagenta      = FromBasicFg(color.FgMagenta)
+	FgMagenta      = FromBasicFg(color.FgCyan)  // pwsh DarkMagenta to DarkCyan
 	FgDefault      = FromBasicFg(color.FgDefault)
 
 	BgWhite   = FromBasicBg(color.BgWhite)
