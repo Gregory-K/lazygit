@@ -264,7 +264,7 @@ func mergeBuildInfo(buildInfo *BuildInfo) {
 		// if lazygit was built from source we'll show the version as the
 		// abbreviated commit hash
 		// buildInfo.Version = utils.ShortHash(revision.Value)
-		buildInfo.Version = "dm_0.41.0~"
+		buildInfo.Version = "dm_0.42.0~"
 	}
 
 	// if version hasn't been set we assume that neither has the date
