@@ -1,3 +1,7 @@
+**Tiny patch for Powershell themes which use 'DarkMagenta' as a background colour. Magenta is now hardcoded cyan. Nothing more, nothing less.**
+
+---
+
 <div align="center">
 <sup>Special thanks to:</sup>
 <br>
