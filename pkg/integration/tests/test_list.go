@@ -23,6 +23,7 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/integration/tests/reflog"
 	"github.com/jesseduffield/lazygit/pkg/integration/tests/staging"
 	"github.com/jesseduffield/lazygit/pkg/integration/tests/stash"
+	"github.com/jesseduffield/lazygit/pkg/integration/tests/status"
 	"github.com/jesseduffield/lazygit/pkg/integration/tests/submodule"
 	"github.com/jesseduffield/lazygit/pkg/integration/tests/sync"
 	"github.com/jesseduffield/lazygit/pkg/integration/tests/tag"
@@ -104,12 +105,15 @@ var tests = []*components.IntegrationTest{
 	custom_commands.BasicCmdFromConfig,
 	custom_commands.CheckForConflicts,
 	custom_commands.ComplexCmdAtRuntime,
+	custom_commands.DeleteFromHistory,
+	custom_commands.EditHistory,
 	custom_commands.FormPrompts,
 	custom_commands.History,
 	custom_commands.MenuFromCommand,
 	custom_commands.MenuFromCommandsOutput,
 	custom_commands.MultiplePrompts,
 	custom_commands.OmitFromHistory,
+	custom_commands.ShowOutputInPanel,
 	custom_commands.SuggestionsCommand,
 	custom_commands.SuggestionsPreset,
 	demo.AmendOldCommit,
@@ -256,7 +260,11 @@ var tests = []*components.IntegrationTest{
 	stash.StashAndKeepIndex,
 	stash.StashIncludingUntrackedFiles,
 	stash.StashStaged,
+	stash.StashStagedPartialFile,
 	stash.StashUnstaged,
+	status.ClickRepoNameToOpenReposMenu,
+	status.ClickToFocus,
+	status.ClickWorkingTreeStateToOpenRebaseOptionsMenu,
 	submodule.Add,
 	submodule.Enter,
 	submodule.EnterNested,
@@ -268,6 +276,7 @@ var tests = []*components.IntegrationTest{
 	sync.ForcePush,
 	sync.ForcePushMultipleMatching,
 	sync.ForcePushMultipleUpstream,
+	sync.ForcePushTriangular,
 	sync.Pull,
 	sync.PullAndSetUpstream,
 	sync.PullMerge,

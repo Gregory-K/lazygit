@@ -631,6 +631,7 @@ type TranslationSet struct {
 	SuggestionsCheatsheetTitle            string
 	// Unlike the cheatsheet title above, the real suggestions title has a little message saying press tab to focus
 	SuggestionsTitle                     string
+	SuggestionsSubtitle                  string
 	ExtrasTitle                          string
 	PushingTagStatus                     string
 	PullRequestURLCopiedToClipboard      string
@@ -1357,7 +1358,7 @@ func EnglishTranslationSet() TranslationSet {
 		ResetHardTooltip:                     "Reset HEAD to the chosen commit, and discard all changes between the current and chosen commit, as well as all current modifications in the working tree.",
 		ViewResetOptions:                     `Reset`,
 		FileResetOptionsTooltip:              "View reset options for working tree (e.g. nuking the working tree).",
-		FixupTooltip:                         "Meld the selected commit into the commit below it. Similar to fixup, but the selected commit's message will be discarded.",
+		FixupTooltip:                         "Meld the selected commit into the commit below it. Similar to squash, but the selected commit's message will be discarded.",
 		CreateFixupCommit:                    "Create fixup commit",
 		CreateFixupCommitTooltip:             "Create 'fixup!' commit for the selected commit. Later on, you can press `{{.squashAbove}}` on this same commit to apply all above fixup commits.",
 		CreateAmendCommit:                    `Create "amend!" commit`,
@@ -1593,6 +1594,7 @@ func EnglishTranslationSet() TranslationSet {
 		NavigationTitle:                       "List panel navigation",
 		SuggestionsCheatsheetTitle:            "Suggestions",
 		SuggestionsTitle:                      "Suggestions (press %s to focus)",
+		SuggestionsSubtitle:                   "(press %s to delete, %s to edit)",
 		ExtrasTitle:                           "Command log",
 		PushingTagStatus:                      "Pushing tag",
 		PullRequestURLCopiedToClipboard:       "Pull request URL copied to clipboard",
