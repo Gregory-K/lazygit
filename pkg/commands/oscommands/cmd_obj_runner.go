@@ -284,6 +284,7 @@ const (
 	Username
 	Passphrase
 	PIN
+	Token
 )
 
 // Whenever we're asked for a password we just enter a newline, which will
@@ -318,7 +319,7 @@ func (self *cmdObjRunner) getCredentialPromptFn(cmdObj ICmdObj) (func(Credential
 }
 
 // runAndDetectCredentialRequest detect a username / password / passphrase question in a command
-// promptUserForCredential is a function that gets executed when this function detect you need to fillin a password or passphrase
+// promptUserForCredential is a function that gets executed when this function detect you need to fill in a password or passphrase
 // The promptUserForCredential argument will be "username", "password" or "passphrase" and expects the user's password/passphrase or username back
 func (self *cmdObjRunner) runAndDetectCredentialRequest(
 	cmdObj ICmdObj,
@@ -376,6 +377,7 @@ func (self *cmdObjRunner) getCheckForCredentialRequestFunc() func([]byte) (Crede
 		`Username\s*for\s*'.+':`:                 Username,
 		`Enter\s*passphrase\s*for\s*key\s*'.+':`: Passphrase,
 		`Enter\s*PIN\s*for\s*.+\s*key\s*.+:`:     PIN,
+		`.*2FA Token.*`:                          Token,
 	}
 
 	compiledPrompts := map[*regexp.Regexp]CredentialType{}

@@ -74,14 +74,22 @@ func (self *TagsController) GetKeybindings(opts types.KeybindingsOpts) []*types.
 			DisplayOnScreen:   true,
 			OpensMenu:         true,
 		},
+		{
+			Key: opts.GetKey(opts.Config.Universal.OpenDiffTool),
+			Handler: self.withItem(func(selectedTag *models.Tag) error {
+				return self.c.Helpers().Diff.OpenDiffToolForRef(selectedTag)
+			}),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.OpenDiffTool,
+		},
 	}
 
 	return bindings
 }
 
-func (self *TagsController) GetOnRenderToMain() func() error {
-	return func() error {
-		return self.c.Helpers().Diff.WithDiffModeCheck(func() error {
+func (self *TagsController) GetOnRenderToMain() func() {
+	return func() {
+		self.c.Helpers().Diff.WithDiffModeCheck(func() {
 			var task types.UpdateTask
 			tag := self.context().GetSelected()
 			if tag == nil {
@@ -91,7 +99,7 @@ func (self *TagsController) GetOnRenderToMain() func() error {
 				task = types.NewRunCommandTask(cmdObj.GetCmd())
 			}
 
-			return self.c.RenderToMainViews(types.RefreshMainOpts{
+			self.c.RenderToMainViews(types.RefreshMainOpts{
 				Pair: self.c.MainViewPairs().Normal,
 				Main: &types.ViewUpdateOpts{
 					Title: "Tag",
@@ -107,7 +115,8 @@ func (self *TagsController) checkout(tag *models.Tag) error {
 	if err := self.c.Helpers().Refs.CheckoutRef(tag.FullRefName(), types.CheckoutRefOptions{}); err != nil {
 		return err
 	}
-	return self.c.PushContext(self.c.Contexts().Branches)
+	self.c.Context().Push(self.c.Contexts().Branches)
+	return nil
 }
 
 func (self *TagsController) localDelete(tag *models.Tag) error {
@@ -127,7 +136,7 @@ func (self *TagsController) remoteDelete(tag *models.Tag) error {
 		},
 	)
 
-	return self.c.Prompt(types.PromptOpts{
+	self.c.Prompt(types.PromptOpts{
 		Title:               title,
 		InitialContent:      "origin",
 		FindSuggestionsFunc: self.c.Helpers().Suggestions.GetRemoteSuggestionsFunc(),
@@ -146,7 +155,7 @@ func (self *TagsController) remoteDelete(tag *models.Tag) error {
 				},
 			)
 
-			return self.c.Confirm(types.ConfirmOpts{
+			self.c.Confirm(types.ConfirmOpts{
 				Title:  confirmTitle,
 				Prompt: confirmPrompt,
 				HandleConfirm: func() error {
@@ -160,8 +169,12 @@ func (self *TagsController) remoteDelete(tag *models.Tag) error {
 					})
 				},
 			})
+
+			return nil
 		},
 	})
+
+	return nil
 }
 
 func (self *TagsController) delete(tag *models.Tag) error {
@@ -204,7 +217,7 @@ func (self *TagsController) push(tag *models.Tag) error {
 		},
 	)
 
-	return self.c.Prompt(types.PromptOpts{
+	self.c.Prompt(types.PromptOpts{
 		Title:               title,
 		InitialContent:      "origin",
 		FindSuggestionsFunc: self.c.Helpers().Suggestions.GetRemoteSuggestionsFunc(),
@@ -215,7 +228,7 @@ func (self *TagsController) push(tag *models.Tag) error {
 
 				// Render again to remove the inline status:
 				self.c.OnUIThread(func() error {
-					_ = self.c.Contexts().Tags.HandleRender()
+					self.c.Contexts().Tags.HandleRender()
 					return nil
 				})
 
@@ -223,6 +236,8 @@ func (self *TagsController) push(tag *models.Tag) error {
 			})
 		},
 	})
+
+	return nil
 }
 
 func (self *TagsController) createResetMenu(tag *models.Tag) error {

@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/commands/oscommands"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/mgutz/str"
+	"github.com/samber/lo"
 )
 
 type BranchCommands struct {
 	*GitCommon
+	allBranchesLogCmdIndex uint8 // keeps track of current all branches log command
 }
 
 func NewBranchCommands(gitCommon *GitCommon) *BranchCommands {
@@ -23,6 +26,15 @@ func NewBranchCommands(gitCommon *GitCommon) *BranchCommands {
 func (self *BranchCommands) New(name string, base string) error {
 	cmdArgs := NewGitCmd("checkout").
 		Arg("-b", name, base).
+		ToArgv()
+
+	return self.cmd.New(cmdArgs).Run()
+}
+
+func (self *BranchCommands) NewWithoutTracking(name string, base string) error {
+	cmdArgs := NewGitCmd("checkout").
+		Arg("-b", name, base).
+		Arg("--no-track").
 		ToArgv()
 
 	return self.cmd.New(cmdArgs).Run()
@@ -134,7 +146,7 @@ func (self *BranchCommands) GetGraph(branchName string) (string, error) {
 }
 
 func (self *BranchCommands) GetGraphCmdObj(branchName string) oscommands.ICmdObj {
-	branchLogCmdTemplate := self.UserConfig.Git.BranchLogCmd
+	branchLogCmdTemplate := self.UserConfig().Git.BranchLogCmd
 	templateValues := map[string]string{
 		"branchName": self.cmd.Quote(branchName),
 	}
@@ -216,13 +228,18 @@ func (self *BranchCommands) Rename(oldName string, newName string) error {
 
 type MergeOpts struct {
 	FastForwardOnly bool
+	Squash          bool
 }
 
 func (self *BranchCommands) Merge(branchName string, opts MergeOpts) error {
+	if opts.Squash && opts.FastForwardOnly {
+		panic("Squash and FastForwardOnly can't both be true")
+	}
 	cmdArgs := NewGitCmd("merge").
 		Arg("--no-edit").
-		Arg(strings.Fields(self.UserConfig.Git.Merging.Args)...).
+		Arg(strings.Fields(self.UserConfig().Git.Merging.Args)...).
 		ArgIf(opts.FastForwardOnly, "--ff-only").
+		ArgIf(opts.Squash, "--squash", "--ff").
 		Arg(branchName).
 		ToArgv()
 
@@ -230,5 +247,40 @@ func (self *BranchCommands) Merge(branchName string, opts MergeOpts) error {
 }
 
 func (self *BranchCommands) AllBranchesLogCmdObj() oscommands.ICmdObj {
-	return self.cmd.New(str.ToArgv(self.UserConfig.Git.AllBranchesLogCmd)).DontLog()
+	// Only choose between non-empty, non-identical commands
+	candidates := lo.Uniq(lo.WithoutEmpty(append([]string{
+		self.UserConfig().Git.AllBranchesLogCmd,
+	},
+		self.UserConfig().Git.AllBranchesLogCmds...,
+	)))
+
+	n := len(candidates)
+
+	i := self.allBranchesLogCmdIndex
+	self.allBranchesLogCmdIndex = uint8((int(i) + 1) % n)
+
+	return self.cmd.New(str.ToArgv(candidates[i])).DontLog()
+}
+
+func (self *BranchCommands) IsBranchMerged(branch *models.Branch, mainBranches *MainBranches) (bool, error) {
+	branchesToCheckAgainst := []string{"HEAD"}
+	if branch.RemoteBranchStoredLocally() {
+		branchesToCheckAgainst = append(branchesToCheckAgainst, fmt.Sprintf("%s@{upstream}", branch.Name))
+	}
+	branchesToCheckAgainst = append(branchesToCheckAgainst, mainBranches.Get()...)
+
+	cmdArgs := NewGitCmd("rev-list").
+		Arg("--max-count=1").
+		Arg(branch.Name).
+		Arg(lo.Map(branchesToCheckAgainst, func(branch string, _ int) string {
+			return fmt.Sprintf("^%s", branch)
+		})...).
+		ToArgv()
+
+	stdout, _, err := self.cmd.New(cmdArgs).RunWithOutputs()
+	if err != nil {
+		return false, err
+	}
+
+	return stdout == "", nil
 }

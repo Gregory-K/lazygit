@@ -34,12 +34,22 @@ func (self *ViewTrait) SetViewPortContent(content string) {
 	self.view.OverwriteLines(y, content)
 }
 
+func (self *ViewTrait) SetViewPortContentAndClearEverythingElse(content string) {
+	_, y := self.view.Origin()
+	self.view.OverwriteLinesAndClearEverythingElse(y, content)
+}
+
+func (self *ViewTrait) SetContentLineCount(lineCount int) {
+	self.view.SetContentLineCount(lineCount)
+}
+
 func (self *ViewTrait) SetContent(content string) {
 	self.view.SetContent(content)
 }
 
 func (self *ViewTrait) SetHighlight(highlight bool) {
 	self.view.Highlight = highlight
+	self.view.HighlightInactive = false
 }
 
 func (self *ViewTrait) SetFooter(value string) {
@@ -47,7 +57,7 @@ func (self *ViewTrait) SetFooter(value string) {
 }
 
 func (self *ViewTrait) SetOriginX(value int) {
-	_ = self.view.SetOriginX(value)
+	self.view.SetOriginX(value)
 }
 
 // tells us the start of line indexes shown in the view currently as well as the capacity of lines shown in the viewport.

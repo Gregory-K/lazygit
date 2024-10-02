@@ -3,7 +3,6 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazygit/pkg/commands/git_commands"
@@ -100,22 +99,22 @@ func (self *BranchesController) GetKeybindings(opts types.KeybindingsOpts) []*ty
 			DisplayOnScreen:   true,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Branches.RebaseBranch),
-			Handler: opts.Guards.OutsideFilterMode(self.rebase),
-			GetDisabledReason: self.require(
-				self.singleItemSelected(self.notRebasingOntoSelf),
-			),
-			Description:     self.c.Tr.RebaseBranch,
-			Tooltip:         self.c.Tr.RebaseBranchTooltip,
-			DisplayOnScreen: true,
+			Key:               opts.GetKey(opts.Config.Branches.RebaseBranch),
+			Handler:           opts.Guards.OutsideFilterMode(self.withItem(self.rebase)),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.RebaseBranch,
+			Tooltip:           self.c.Tr.RebaseBranchTooltip,
+			OpensMenu:         true,
+			DisplayOnScreen:   true,
 		},
 		{
 			Key:               opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
 			Handler:           opts.Guards.OutsideFilterMode(self.merge),
-			GetDisabledReason: self.require(self.singleItemSelected()),
+			GetDisabledReason: self.require(self.singleItemSelected(self.notMergingIntoYourself)),
 			Description:       self.c.Tr.Merge,
 			Tooltip:           self.c.Tr.MergeBranchTooltip,
 			DisplayOnScreen:   true,
+			OpensMenu:         true,
 		},
 		{
 			Key:               opts.GetKey(opts.Config.Branches.FastForward),
@@ -159,12 +158,20 @@ func (self *BranchesController) GetKeybindings(opts types.KeybindingsOpts) []*ty
 			OpensMenu:         true,
 			DisplayOnScreen:   true,
 		},
+		{
+			Key: opts.GetKey(opts.Config.Universal.OpenDiffTool),
+			Handler: self.withItem(func(selectedBranch *models.Branch) error {
+				return self.c.Helpers().Diff.OpenDiffToolForRef(selectedBranch)
+			}),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.OpenDiffTool,
+		},
 	}
 }
 
-func (self *BranchesController) GetOnRenderToMain() func() error {
-	return func() error {
-		return self.c.Helpers().Diff.WithDiffModeCheck(func() error {
+func (self *BranchesController) GetOnRenderToMain() func() {
+	return func() {
+		self.c.Helpers().Diff.WithDiffModeCheck(func() {
 			var task types.UpdateTask
 			branch := self.context().GetSelected()
 			if branch == nil {
@@ -175,7 +182,7 @@ func (self *BranchesController) GetOnRenderToMain() func() error {
 				task = types.NewRunPtyTask(cmdObj.GetCmd())
 			}
 
-			return self.c.RenderToMainViews(types.RefreshMainOpts{
+			self.c.RenderToMainViews(types.RefreshMainOpts{
 				Pair: self.c.MainViewPairs().Normal,
 				Main: &types.ViewUpdateOpts{
 					Title: self.c.Tr.LogTitle,
@@ -203,6 +210,40 @@ func (self *BranchesController) viewUpstreamOptions(selectedBranch *models.Branc
 				ShowBranchHeads:         false,
 			})
 		},
+	}
+
+	var disabledReason *types.DisabledReason
+	baseBranch, err := self.c.Git().Loaders.BranchLoader.GetBaseBranch(selectedBranch, self.c.Model().MainBranches)
+	if err != nil {
+		return err
+	}
+	if baseBranch == "" {
+		baseBranch = self.c.Tr.CouldNotDetermineBaseBranch
+		disabledReason = &types.DisabledReason{Text: self.c.Tr.CouldNotDetermineBaseBranch}
+	}
+	shortBaseBranchName := helpers.ShortBranchName(baseBranch)
+	label := utils.ResolvePlaceholderString(
+		self.c.Tr.ViewDivergenceFromBaseBranch,
+		map[string]string{"baseBranch": shortBaseBranchName},
+	)
+	viewDivergenceFromBaseBranchItem := &types.MenuItem{
+		LabelColumns: []string{label},
+		Key:          'b',
+		OnPress: func() error {
+			branch := self.context().GetSelected()
+			if branch == nil {
+				return nil
+			}
+
+			return self.c.Helpers().SubCommits.ViewSubCommits(helpers.ViewSubCommitsOpts{
+				Ref:                     branch,
+				TitleRef:                fmt.Sprintf("%s <-> %s", branch.RefName(), shortBaseBranchName),
+				RefToShowDivergenceFrom: baseBranch,
+				Context:                 self.context(),
+				ShowBranchHeads:         false,
+			})
+		},
+		DisabledReason: disabledReason,
 	}
 
 	unsetUpstreamItem := &types.MenuItem{
@@ -312,6 +353,7 @@ func (self *BranchesController) viewUpstreamOptions(selectedBranch *models.Branc
 
 	options := []*types.MenuItem{
 		viewDivergenceItem,
+		viewDivergenceFromBaseBranchItem,
 		unsetUpstreamItem,
 		setUpstreamItem,
 		upstreamResetItem,
@@ -367,13 +409,15 @@ func (self *BranchesController) promptToCheckoutWorktree(worktree *models.Worktr
 		"worktreeName": worktree.Name,
 	})
 
-	return self.c.Confirm(types.ConfirmOpts{
+	self.c.Confirm(types.ConfirmOpts{
 		Title:  self.c.Tr.SwitchToWorktree,
 		Prompt: prompt,
 		HandleConfirm: func() error {
 			return self.c.Helpers().Worktree.Switch(worktree, context.LOCAL_BRANCHES_CONTEXT_KEY)
 		},
 	})
+
+	return nil
 }
 
 func (self *BranchesController) handleCreatePullRequest(selectedBranch *models.Branch) error {
@@ -417,7 +461,7 @@ func (self *BranchesController) forceCheckout() error {
 	message := self.c.Tr.SureForceCheckout
 	title := self.c.Tr.ForceCheckoutBranch
 
-	return self.c.Confirm(types.ConfirmOpts{
+	self.c.Confirm(types.ConfirmOpts{
 		Title:  title,
 		Prompt: message,
 		HandleConfirm: func() error {
@@ -428,10 +472,12 @@ func (self *BranchesController) forceCheckout() error {
 			return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC})
 		},
 	})
+
+	return nil
 }
 
 func (self *BranchesController) checkoutByName() error {
-	return self.c.Prompt(types.PromptOpts{
+	self.c.Prompt(types.PromptOpts{
 		Title:               self.c.Tr.BranchName + ":",
 		FindSuggestionsFunc: self.c.Helpers().Suggestions.GetRefsSuggestionsFunc(),
 		HandleConfirm: func(response string) error {
@@ -442,18 +488,22 @@ func (self *BranchesController) checkoutByName() error {
 			}
 			return self.c.Helpers().Refs.CheckoutRef(response, types.CheckoutRefOptions{
 				OnRefNotFound: func(ref string) error {
-					return self.c.Confirm(types.ConfirmOpts{
+					self.c.Confirm(types.ConfirmOpts{
 						Title:  self.c.Tr.BranchNotFoundTitle,
 						Prompt: fmt.Sprintf("%s %s%s", self.c.Tr.BranchNotFoundPrompt, ref, "?"),
 						HandleConfirm: func() error {
 							return self.createNewBranchWithName(ref)
 						},
 					})
+
+					return nil
 				},
 			})
 		},
 	},
 	)
+
+	return nil
 }
 
 func (self *BranchesController) createNewBranchWithName(newBranchName string) error {
@@ -470,89 +520,16 @@ func (self *BranchesController) createNewBranchWithName(newBranchName string) er
 	return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, KeepBranchSelectionIndex: true})
 }
 
-func (self *BranchesController) checkedOutByOtherWorktree(branch *models.Branch) bool {
-	return git_commands.CheckedOutByOtherWorktree(branch, self.c.Model().Worktrees)
-}
-
-func (self *BranchesController) promptWorktreeBranchDelete(selectedBranch *models.Branch) error {
-	worktree, ok := self.worktreeForBranch(selectedBranch)
-	if !ok {
-		self.c.Log.Error("promptWorktreeBranchDelete out of sync with list of worktrees")
-		return nil
-	}
-
-	// TODO: i18n
-	title := utils.ResolvePlaceholderString(self.c.Tr.BranchCheckedOutByWorktree, map[string]string{
-		"worktreeName": worktree.Name,
-		"branchName":   selectedBranch.Name,
-	})
-	return self.c.Menu(types.CreateMenuOptions{
-		Title: title,
-		Items: []*types.MenuItem{
-			{
-				Label: self.c.Tr.SwitchToWorktree,
-				OnPress: func() error {
-					return self.c.Helpers().Worktree.Switch(worktree, context.LOCAL_BRANCHES_CONTEXT_KEY)
-				},
-			},
-			{
-				Label:   self.c.Tr.DetachWorktree,
-				Tooltip: self.c.Tr.DetachWorktreeTooltip,
-				OnPress: func() error {
-					return self.c.Helpers().Worktree.Detach(worktree)
-				},
-			},
-			{
-				Label: self.c.Tr.RemoveWorktree,
-				OnPress: func() error {
-					return self.c.Helpers().Worktree.Remove(worktree, false)
-				},
-			},
-		},
-	})
-}
-
 func (self *BranchesController) localDelete(branch *models.Branch) error {
-	if self.checkedOutByOtherWorktree(branch) {
-		return self.promptWorktreeBranchDelete(branch)
-	}
-
-	return self.c.WithWaitingStatus(self.c.Tr.DeletingStatus, func(_ gocui.Task) error {
-		self.c.LogAction(self.c.Tr.Actions.DeleteLocalBranch)
-		err := self.c.Git().Branch.LocalDelete(branch.Name, false)
-		if err != nil && strings.Contains(err.Error(), "git branch -D ") {
-			return self.forceDelete(branch)
-		}
-		if err != nil {
-			return err
-		}
-		return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, Scope: []types.RefreshableView{types.BRANCHES}})
-	})
+	return self.c.Helpers().BranchesHelper.ConfirmLocalDelete(branch)
 }
 
 func (self *BranchesController) remoteDelete(branch *models.Branch) error {
-	return self.c.Helpers().BranchesHelper.ConfirmDeleteRemote(branch.UpstreamRemote, branch.Name)
+	return self.c.Helpers().BranchesHelper.ConfirmDeleteRemote(branch.UpstreamRemote, branch.UpstreamBranch)
 }
 
-func (self *BranchesController) forceDelete(branch *models.Branch) error {
-	title := self.c.Tr.ForceDeleteBranchTitle
-	message := utils.ResolvePlaceholderString(
-		self.c.Tr.ForceDeleteBranchMessage,
-		map[string]string{
-			"selectedBranchName": branch.Name,
-		},
-	)
-
-	return self.c.Confirm(types.ConfirmOpts{
-		Title:  title,
-		Prompt: message,
-		HandleConfirm: func() error {
-			if err := self.c.Git().Branch.LocalDelete(branch.Name, true); err != nil {
-				return err
-			}
-			return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, Scope: []types.RefreshableView{types.BRANCHES}})
-		},
-	})
+func (self *BranchesController) localAndRemoteDelete(branch *models.Branch) error {
+	return self.c.Helpers().BranchesHelper.ConfirmLocalAndRemoteDelete(branch)
 }
 
 func (self *BranchesController) delete(branch *models.Branch) error {
@@ -580,6 +557,19 @@ func (self *BranchesController) delete(branch *models.Branch) error {
 		remoteDeleteItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
 	}
 
+	deleteBothItem := &types.MenuItem{
+		Label: self.c.Tr.DeleteLocalAndRemoteBranch,
+		Key:   'b',
+		OnPress: func() error {
+			return self.localAndRemoteDelete(branch)
+		},
+	}
+	if checkedOutBranch.Name == branch.Name {
+		deleteBothItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.CantDeleteCheckOutBranch}
+	} else if !branch.IsTrackingRemote() || branch.UpstreamGone {
+		deleteBothItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
+	}
+
 	menuTitle := utils.ResolvePlaceholderString(
 		self.c.Tr.DeleteBranchTitle,
 		map[string]string{
@@ -589,7 +579,7 @@ func (self *BranchesController) delete(branch *models.Branch) error {
 
 	return self.c.Menu(types.CreateMenuOptions{
 		Title: menuTitle,
-		Items: []*types.MenuItem{localDeleteItem, remoteDeleteItem},
+		Items: []*types.MenuItem{localDeleteItem, remoteDeleteItem, deleteBothItem},
 	})
 }
 
@@ -598,19 +588,8 @@ func (self *BranchesController) merge() error {
 	return self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(selectedBranchName)
 }
 
-func (self *BranchesController) rebase() error {
-	selectedBranchName := self.context().GetSelected().Name
-	return self.c.Helpers().MergeAndRebase.RebaseOntoRef(selectedBranchName)
-}
-
-func (self *BranchesController) notRebasingOntoSelf(branch *models.Branch) *types.DisabledReason {
-	selectedBranchName := branch.Name
-	checkedOutBranch := self.c.Helpers().Refs.GetCheckedOutRef().Name
-	if selectedBranchName == checkedOutBranch {
-		return &types.DisabledReason{Text: self.c.Tr.CantRebaseOntoSelf}
-	}
-
-	return nil
+func (self *BranchesController) rebase(branch *models.Branch) error {
+	return self.c.Helpers().MergeAndRebase.RebaseOntoRef(branch.Name)
 }
 
 func (self *BranchesController) fastForward(branch *models.Branch) error {
@@ -673,7 +652,8 @@ func (self *BranchesController) createSortMenu() error {
 			return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, Scope: []types.RefreshableView{types.BRANCHES}})
 		}
 		return nil
-	})
+	},
+		self.c.GetAppState().LocalBranchSortOrder)
 }
 
 func (self *BranchesController) createResetMenu(selectedBranch *models.Branch) error {
@@ -682,7 +662,7 @@ func (self *BranchesController) createResetMenu(selectedBranch *models.Branch) e
 
 func (self *BranchesController) rename(branch *models.Branch) error {
 	promptForNewName := func() error {
-		return self.c.Prompt(types.PromptOpts{
+		self.c.Prompt(types.PromptOpts{
 			Title:          self.c.Tr.NewBranchNamePrompt + " " + branch.Name + ":",
 			InitialContent: branch.Name,
 			HandleConfirm: func(newBranchName string) error {
@@ -701,15 +681,15 @@ func (self *BranchesController) rename(branch *models.Branch) error {
 				for i, newBranch := range self.c.Model().Branches {
 					if newBranch.Name == newBranchName {
 						self.context().SetSelection(i)
-						if err := self.context().HandleRender(); err != nil {
-							return err
-						}
+						self.context().HandleRender()
 					}
 				}
 
 				return nil
 			},
 		})
+
+		return nil
 	}
 
 	// I could do an explicit check here for whether the branch is tracking a remote branch
@@ -719,11 +699,13 @@ func (self *BranchesController) rename(branch *models.Branch) error {
 		return promptForNewName()
 	}
 
-	return self.c.Confirm(types.ConfirmOpts{
+	self.c.Confirm(types.ConfirmOpts{
 		Title:         self.c.Tr.RenameBranch,
 		Prompt:        self.c.Tr.RenameBranchWarning,
 		HandleConfirm: promptForNewName,
 	})
+
+	return nil
 }
 
 func (self *BranchesController) newBranch(selectedBranch *models.Branch) error {
@@ -748,13 +730,15 @@ func (self *BranchesController) createPullRequestMenu(selectedBranch *models.Bra
 			{
 				LabelColumns: fromToLabelColumns(branch.Name, self.c.Tr.SelectBranch),
 				OnPress: func() error {
-					return self.c.Prompt(types.PromptOpts{
+					self.c.Prompt(types.PromptOpts{
 						Title:               branch.Name + " →",
 						FindSuggestionsFunc: self.c.Helpers().Suggestions.GetRemoteBranchesSuggestionsFunc("/"),
 						HandleConfirm: func(targetBranchName string) error {
 							return self.createPullRequest(branch.Name, targetBranchName)
 						},
 					})
+
+					return nil
 				},
 			},
 		}
@@ -777,7 +761,7 @@ func (self *BranchesController) createPullRequestMenu(selectedBranch *models.Bra
 
 	menuItems = append(menuItems, menuItemsForBranch(selectedBranch)...)
 
-	return self.c.Menu(types.CreateMenuOptions{Title: fmt.Sprintf(self.c.Tr.CreatePullRequestOptions), Items: menuItems})
+	return self.c.Menu(types.CreateMenuOptions{Title: fmt.Sprint(self.c.Tr.CreatePullRequestOptions), Items: menuItems})
 }
 
 func (self *BranchesController) createPullRequest(from string, to string) error {
@@ -798,6 +782,17 @@ func (self *BranchesController) createPullRequest(from string, to string) error 
 func (self *BranchesController) branchIsReal(branch *models.Branch) *types.DisabledReason {
 	if !branch.IsRealBranch() {
 		return &types.DisabledReason{Text: self.c.Tr.SelectedItemIsNotABranch}
+	}
+
+	return nil
+}
+
+func (self *BranchesController) notMergingIntoYourself(branch *models.Branch) *types.DisabledReason {
+	selectedBranchName := branch.Name
+	checkedOutBranch := self.c.Helpers().Refs.GetCheckedOutRef().Name
+
+	if checkedOutBranch == selectedBranchName {
+		return &types.DisabledReason{Text: self.c.Tr.CantMergeBranchIntoItself}
 	}
 
 	return nil

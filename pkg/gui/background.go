@@ -1,6 +1,8 @@
 package gui
 
 import (
+	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -23,7 +25,7 @@ func (self *BackgroundRoutineMgr) PauseBackgroundRefreshes(pause bool) {
 }
 
 func (self *BackgroundRoutineMgr) startBackgroundRoutines() {
-	userConfig := self.gui.UserConfig
+	userConfig := self.gui.UserConfig()
 
 	if userConfig.Git.AutoFetch {
 		fetchInterval := userConfig.Refresher.FetchInterval
@@ -46,19 +48,42 @@ func (self *BackgroundRoutineMgr) startBackgroundRoutines() {
 				refreshInterval)
 		}
 	}
+
+	if self.gui.Config.GetDebug() {
+		self.goEvery(time.Second*time.Duration(10), self.gui.stopChan, func() error {
+			formatBytes := func(b uint64) string {
+				const unit = 1000
+				if b < unit {
+					return fmt.Sprintf("%d B", b)
+				}
+				div, exp := uint64(unit), 0
+				for n := b / unit; n >= unit; n /= unit {
+					div *= unit
+					exp++
+				}
+				return fmt.Sprintf("%.1f %cB",
+					float64(b)/float64(div), "kMGTPE"[exp])
+			}
+
+			m := runtime.MemStats{}
+			runtime.ReadMemStats(&m)
+			self.gui.c.Log.Infof("Heap memory in use: %s", formatBytes(m.HeapAlloc))
+			return nil
+		})
+	}
 }
 
 func (self *BackgroundRoutineMgr) startBackgroundFetch() {
 	self.gui.waitForIntro.Wait()
 
 	isNew := self.gui.IsNewRepo
-	userConfig := self.gui.UserConfig
+	userConfig := self.gui.UserConfig()
 	if !isNew {
 		time.After(time.Duration(userConfig.Refresher.FetchInterval) * time.Second)
 	}
 	err := self.backgroundFetch()
 	if err != nil && strings.Contains(err.Error(), "exit status 128") && isNew {
-		_ = self.gui.c.Alert(self.gui.c.Tr.NoAutomaticGitFetchTitle, self.gui.c.Tr.NoAutomaticGitFetchBody)
+		self.gui.c.Alert(self.gui.c.Tr.NoAutomaticGitFetchTitle, self.gui.c.Tr.NoAutomaticGitFetchBody)
 	} else {
 		self.goEvery(time.Second*time.Duration(userConfig.Refresher.FetchInterval), self.gui.stopChan, func() error {
 			err := self.backgroundFetch()

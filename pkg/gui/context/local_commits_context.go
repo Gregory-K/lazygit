@@ -2,8 +2,10 @@ package context
 
 import (
 	"log"
+	"strings"
 	"time"
 
+	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/commands/types/enums"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
@@ -18,8 +20,9 @@ type LocalCommitsContext struct {
 }
 
 var (
-	_ types.IListContext    = (*LocalCommitsContext)(nil)
-	_ types.DiffableContext = (*LocalCommitsContext)(nil)
+	_ types.IListContext       = (*LocalCommitsContext)(nil)
+	_ types.DiffableContext    = (*LocalCommitsContext)(nil)
+	_ types.ISearchableContext = (*LocalCommitsContext)(nil)
 )
 
 func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
@@ -31,7 +34,7 @@ func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
 	getDisplayStrings := func(startIdx int, endIdx int) [][]string {
 		selectedCommitHash := ""
 
-		if c.CurrentContext().GetKey() == LOCAL_COMMITS_CONTEXT_KEY {
+		if c.Context().Current().GetKey() == LOCAL_COMMITS_CONTEXT_KEY {
 			selectedCommit := viewModel.GetSelected()
 			if selectedCommit != nil {
 				selectedCommitHash = selectedCommit.Hash
@@ -51,10 +54,10 @@ func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
 			c.Modes().CherryPicking.SelectedHashSet(),
 			c.Modes().Diffing.Ref,
 			c.Modes().MarkedBaseCommit.GetHash(),
-			c.UserConfig.Gui.TimeFormat,
-			c.UserConfig.Gui.ShortTimeFormat,
+			c.UserConfig().Gui.TimeFormat,
+			c.UserConfig().Gui.ShortTimeFormat,
 			time.Now(),
-			c.UserConfig.Git.ParseEmoji,
+			c.UserConfig().Git.ParseEmoji,
 			selectedCommitHash,
 			startIdx,
 			endIdx,
@@ -69,12 +72,13 @@ func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
 		SearchTrait:           NewSearchTrait(c),
 		ListContextTrait: &ListContextTrait{
 			Context: NewSimpleContext(NewBaseContext(NewBaseContextOpts{
-				View:                       c.Views().Commits,
-				WindowName:                 "commits",
-				Key:                        LOCAL_COMMITS_CONTEXT_KEY,
-				Kind:                       types.SIDE_CONTEXT,
-				Focusable:                  true,
-				NeedsRerenderOnWidthChange: true,
+				View:                        c.Views().Commits,
+				WindowName:                  "commits",
+				Key:                         LOCAL_COMMITS_CONTEXT_KEY,
+				Kind:                        types.SIDE_CONTEXT,
+				Focusable:                   true,
+				NeedsRerenderOnWidthChange:  types.NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_SCREEN_MODE_CHANGES,
+				NeedsRerenderOnHeightChange: true,
 			})),
 			ListRenderer: ListRenderer{
 				list:              viewModel,
@@ -82,13 +86,11 @@ func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
 			},
 			c:                       c,
 			refreshViewportOnChange: true,
+			renderOnlyVisibleLines:  true,
 		},
 	}
 
-	ctx.GetView().SetOnSelectItem(ctx.SearchTrait.onSelectItemWrapper(func(selectedLineIdx int) error {
-		ctx.GetList().SetSelection(selectedLineIdx)
-		return ctx.HandleFocus(types.OnFocusOpts{})
-	}))
+	ctx.GetView().SetOnSelectItem(ctx.SearchTrait.onSelectItemWrapper(ctx.OnSearchSelect))
 
 	return ctx
 }
@@ -108,7 +110,7 @@ func NewLocalCommitsViewModel(getModel func() []*models.Commit, c *ContextCommon
 	self := &LocalCommitsViewModel{
 		ListViewModel:     NewListViewModel(getModel),
 		limitCommits:      true,
-		showWholeGitGraph: c.UserConfig.Git.Log.ShowWholeGraph,
+		showWholeGitGraph: c.UserConfig().Git.Log.ShowWholeGraph,
 	}
 
 	return self
@@ -124,6 +126,19 @@ func (self *LocalCommitsContext) GetSelectedRef() types.Ref {
 		return nil
 	}
 	return commit
+}
+
+func (self *LocalCommitsContext) GetSelectedRefRangeForDiffFiles() *types.RefRange {
+	commits, startIdx, endIdx := self.GetSelectedItems()
+	if commits == nil || startIdx == endIdx {
+		return nil
+	}
+	from := commits[len(commits)-1]
+	to := commits[0]
+	if from.IsTODO() || to.IsTODO() {
+		return nil
+	}
+	return &types.RefRange{From: from, To: to}
 }
 
 // Returns the commit hash of the selected commit, or an empty string if no
@@ -153,6 +168,10 @@ func (self *LocalCommitsContext) GetDiffTerminals() []string {
 	itemId := self.GetSelectedItemId()
 
 	return []string{itemId}
+}
+
+func (self *LocalCommitsContext) ModelSearchResults(searchStr string, caseSensitive bool) []gocui.SearchPosition {
+	return searchModelCommits(caseSensitive, self.GetCommits(), self.ColumnPositions(), searchStr)
 }
 
 func (self *LocalCommitsViewModel) SetLimitCommits(value bool) {
@@ -193,4 +212,28 @@ func shouldShowGraph(c *ContextCommon) bool {
 
 	log.Fatalf("Unknown value for git.log.showGraph: %s. Expected one of: 'always', 'never', 'when-maximised'", value)
 	return false
+}
+
+func searchModelCommits(caseSensitive bool, commits []*models.Commit, columnPositions []int, searchStr string) []gocui.SearchPosition {
+	if columnPositions == nil {
+		// This should never happen. We are being called at a time where our
+		// entire view content is scrolled out of view, so that we didn't draw
+		// anything the last time we rendered. If we run into a scenario where
+		// this happens, we should fix it, but until we found them all, at least
+		// make sure we don't crash.
+		return []gocui.SearchPosition{}
+	}
+
+	normalize := lo.Ternary(caseSensitive, func(s string) string { return s }, strings.ToLower)
+	return lo.FilterMap(commits, func(commit *models.Commit, idx int) (gocui.SearchPosition, bool) {
+		// The XStart and XEnd values are only used if the search string can't
+		// be found in the view. This can really only happen if the user is
+		// searching for a commit hash that is longer than the truncated hash
+		// that we render. So we just set the XStart and XEnd values to the
+		// start and end of the commit hash column, which is the second one.
+		result := gocui.SearchPosition{XStart: columnPositions[1], XEnd: columnPositions[2] - 1, Y: idx}
+		return result, strings.Contains(normalize(commit.Hash), searchStr) ||
+			strings.Contains(normalize(commit.Name), searchStr) ||
+			strings.Contains(normalize(commit.ExtraInfo), searchStr) // allow searching for tags
+	})
 }

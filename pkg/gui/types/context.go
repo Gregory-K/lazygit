@@ -20,7 +20,7 @@ const (
 	// When you open a popup over it, we'll let you return to it upon pressing escape
 	PERSISTENT_POPUP
 	// A temporary popup is one that could be used for various things (e.g. a generic menu or confirmation popup).
-	// Because we re-use these contexts, they're temporary in that you can't return to them after you've switched from them
+	// Because we reuse these contexts, they're temporary in that you can't return to them after you've switched from them
 	// to some other context, because the context you switched to might actually be the same context but rendering different content.
 	// We should really be able to spawn new contexts for menus/prompts so that we can actually return to old ones.
 	TEMPORARY_POPUP
@@ -35,9 +35,20 @@ const (
 
 type ParentContexter interface {
 	SetParentContext(Context)
-	// we return a bool here to tell us whether or not the returned value just wraps a nil
-	GetParentContext() (Context, bool)
+	GetParentContext() Context
 }
+
+type NeedsRerenderOnWidthChangeLevel int
+
+const (
+	// view doesn't render differently when its width changes
+	NEEDS_RERENDER_ON_WIDTH_CHANGE_NONE NeedsRerenderOnWidthChangeLevel = iota
+	// view renders differently when its width changes. An example is a view
+	// that truncates long lines to the view width, e.g. the branches view
+	NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_WIDTH_CHANGES
+	// view renders differently only when the screen mode changes
+	NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_SCREEN_MODE_CHANGES
+)
 
 type IBaseContext interface {
 	HasKeybindings
@@ -60,8 +71,14 @@ type IBaseContext interface {
 	// determined independently.
 	HasControlledBounds() bool
 
-	// true if the view needs to be rerendered when its width changes
-	NeedsRerenderOnWidthChange() bool
+	// the total height of the content that the view is currently showing
+	TotalContentHeight() int
+
+	// to what extent the view needs to be rerendered when its width changes
+	NeedsRerenderOnWidthChange() NeedsRerenderOnWidthChangeLevel
+
+	// true if the view needs to be rerendered when its height changes
+	NeedsRerenderOnHeightChange() bool
 
 	// returns the desired title for the view upon activation. If there is no desired title (returns empty string), then
 	// no title will be set
@@ -71,24 +88,25 @@ type IBaseContext interface {
 
 	AddKeybindingsFn(KeybindingsFn)
 	AddMouseKeybindingsFn(MouseKeybindingsFn)
+	ClearAllBindingsFn()
 
 	// This is a bit of a hack at the moment: we currently only set an onclick function so that
 	// our list controller can come along and wrap it in a list-specific click handler.
 	// We'll need to think of a better way to do this.
 	AddOnClickFn(func() error)
 
-	AddOnRenderToMainFn(func() error)
-	AddOnFocusFn(func(OnFocusOpts) error)
-	AddOnFocusLostFn(func(OnFocusLostOpts) error)
+	AddOnRenderToMainFn(func())
+	AddOnFocusFn(func(OnFocusOpts))
+	AddOnFocusLostFn(func(OnFocusLostOpts))
 }
 
 type Context interface {
 	IBaseContext
 
-	HandleFocus(opts OnFocusOpts) error
-	HandleFocusLost(opts OnFocusLostOpts) error
-	HandleRender() error
-	HandleRenderToMain() error
+	HandleFocus(opts OnFocusOpts)
+	HandleFocusLost(opts OnFocusLostOpts)
+	HandleRender()
+	HandleRenderToMain()
 }
 
 type ISearchHistoryContext interface {
@@ -114,12 +132,16 @@ type ISearchableContext interface {
 	Context
 	ISearchHistoryContext
 
+	// These are all implemented by SearchTrait
 	SetSearchString(string)
 	GetSearchString() string
 	ClearSearchString()
 	IsSearching() bool
 	IsSearchableContext()
 	RenderSearchStatus(int, int)
+
+	// This must be implemented by each concrete context. Return nil if not searching the model.
+	ModelSearchResults(searchStr string, caseSensitive bool) []gocui.SearchPosition
 }
 
 type DiffableContext interface {
@@ -146,6 +168,7 @@ type IListContext interface {
 	FocusLine()
 	IsListContext() // used for type switch
 	RangeSelectEnabled() bool
+	RenderOnlyVisibleLines() bool
 }
 
 type IPatchExplorerContext interface {
@@ -154,11 +177,11 @@ type IPatchExplorerContext interface {
 	GetState() *patch_exploring.State
 	SetState(*patch_exploring.State)
 	GetIncludedLineIndices() []int
-	RenderAndFocus(isFocused bool) error
-	Render(isFocused bool) error
-	Focus() error
+	RenderAndFocus(isFocused bool)
+	Render(isFocused bool)
+	Focus()
 	GetContentToRender(isFocused bool) string
-	NavigateTo(isFocused bool, selectedLineIdx int) error
+	NavigateTo(isFocused bool, selectedLineIdx int)
 	GetMutex() *deadlock.Mutex
 	IsPatchExplorerContext() // used for type switch
 }
@@ -168,6 +191,8 @@ type IViewTrait interface {
 	SetRangeSelectStart(yIdx int)
 	CancelRangeSelect()
 	SetViewPortContent(content string)
+	SetViewPortContentAndClearEverythingElse(content string)
+	SetContentLineCount(lineCount int)
 	SetContent(content string)
 	SetFooter(value string)
 	SetOriginX(value int)
@@ -207,9 +232,9 @@ type HasKeybindings interface {
 	GetKeybindings(opts KeybindingsOpts) []*Binding
 	GetMouseKeybindings(opts KeybindingsOpts) []*gocui.ViewMouseBinding
 	GetOnClick() func() error
-	GetOnRenderToMain() func() error
-	GetOnFocus() func(OnFocusOpts) error
-	GetOnFocusLost() func(OnFocusLostOpts) error
+	GetOnRenderToMain() func()
+	GetOnFocus() func(OnFocusOpts)
+	GetOnFocusLost() func(OnFocusLostOpts)
 }
 
 type IController interface {
@@ -253,13 +278,16 @@ type ListItem interface {
 }
 
 type IContextMgr interface {
-	Push(context Context, opts ...OnFocusOpts) error
-	Pop() error
-	Replace(context Context) error
+	Push(context Context, opts ...OnFocusOpts)
+	Pop()
+	Replace(context Context)
+	Activate(context Context, opts OnFocusOpts)
 	Current() Context
 	CurrentStatic() Context
 	CurrentSide() Context
+	CurrentPopup() []Context
 	IsCurrent(c Context) bool
+	IsCurrentOrParent(c Context) bool
 	ForEach(func(Context))
 	AllList() []IListContext
 	AllFilterable() []IFilterableContext

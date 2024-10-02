@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/samber/lo"
@@ -21,10 +22,22 @@ type ColumnConfig struct {
 	Alignment Alignment
 }
 
+func StringWidth(s string) int {
+	// We are intentionally not using a range loop here, because that would
+	// convert the characters to runes, which is unnecessary work in this case.
+	for i := 0; i < len(s); i++ {
+		if s[i] > unicode.MaxASCII {
+			return runewidth.StringWidth(s)
+		}
+	}
+
+	return len(s)
+}
+
 // WithPadding pads a string as much as you want
 func WithPadding(str string, padding int, alignment Alignment) string {
 	uncoloredStr := Decolorise(str)
-	width := runewidth.StringWidth(uncoloredStr)
+	width := StringWidth(uncoloredStr)
 	if padding < width {
 		return str
 	}
@@ -41,6 +54,10 @@ func WithPadding(str string, padding int, alignment Alignment) string {
 // returns a list of strings that should be joined with "\n", and an array of
 // the column positions
 func RenderDisplayStrings(displayStringsArr [][]string, columnAlignments []Alignment) ([]string, []int) {
+	if len(displayStringsArr) == 0 {
+		return []string{}, nil
+	}
+
 	displayStringsArr, columnAlignments, removedColumns := excludeBlankColumns(displayStringsArr, columnAlignments)
 	padWidths := getPadWidths(displayStringsArr)
 	columnConfigs := make([]ColumnConfig, len(padWidths))
@@ -144,7 +161,7 @@ func getPadWidths(stringArrays [][]string) []int {
 		return MaxFn(stringArrays, func(stringArray []string) int {
 			uncoloredStr := Decolorise(stringArray[i])
 
-			return runewidth.StringWidth(uncoloredStr)
+			return StringWidth(uncoloredStr)
 		})
 	})
 }
@@ -161,10 +178,10 @@ func MaxFn[T any](items []T, fn func(T) int) int {
 
 // TruncateWithEllipsis returns a string, truncated to a certain length, with an ellipsis
 func TruncateWithEllipsis(str string, limit int) string {
-	if runewidth.StringWidth(str) > limit && limit <= 3 {
+	if StringWidth(str) > limit && limit <= 2 {
 		return strings.Repeat(".", limit)
 	}
-	return runewidth.Truncate(str, limit, "...")
+	return runewidth.Truncate(str, limit, "…")
 }
 
 func SafeTruncate(str string, limit int) string {

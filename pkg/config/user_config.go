@@ -22,7 +22,6 @@ type UserConfig struct {
 	// Config relating to things outside of Lazygit like how files are opened, copying to clipboard, etc
 	OS OSConfig `yaml:"os,omitempty"`
 	// If true, don't display introductory popups upon opening Lazygit.
-	// Lazygit sets this to true upon first runninng the program so that you don't see introductory popups every time you open the program.
 	DisableStartupPopups bool `yaml:"disableStartupPopups"`
 	// User-configured commands that can be invoked from within Lazygit
 	CustomCommands []CustomCommand `yaml:"customCommands" jsonschema:"uniqueItems=true"`
@@ -78,6 +77,9 @@ type GuiConfig struct {
 	SidePanelWidth float64 `yaml:"sidePanelWidth" jsonschema:"maximum=1,minimum=0"`
 	// If true, increase the height of the focused side window; creating an accordion effect.
 	ExpandFocusedSidePanel bool `yaml:"expandFocusedSidePanel"`
+	// The weight of the expanded side panel, relative to the other panels. 2 means
+	// twice as tall as the other panels. Only relevant if `expandFocusedSidePanel` is true.
+	ExpandedSidePanelWeight int `yaml:"expandedSidePanelWeight"`
 	// Sometimes the main window is split in two (e.g. when the selected file has both staged and unstaged changes). This setting controls how the two sections are split.
 	// Options are:
 	// - 'horizontal': split the window horizontally
@@ -123,10 +125,17 @@ type GuiConfig struct {
 	NerdFontsVersion string `yaml:"nerdFontsVersion" jsonschema:"enum=2,enum=3,enum="`
 	// If true (default), file icons are shown in the file views. Only relevant if NerdFontsVersion is not empty.
 	ShowFileIcons bool `yaml:"showFileIcons"`
+	// Length of author name in (non-expanded) commits view. 2 means show initials only.
+	CommitAuthorShortLength int `yaml:"commitAuthorShortLength"`
+	// Length of author name in expanded commits view. 2 means show initials only.
+	CommitAuthorLongLength int `yaml:"commitAuthorLongLength"`
 	// Length of commit hash in commits view. 0 shows '*' if NF icons aren't on.
 	CommitHashLength int `yaml:"commitHashLength" jsonschema:"minimum=0"`
 	// If true, show commit hashes alongside branch names in the branches view.
 	ShowBranchCommitHash bool `yaml:"showBranchCommitHash"`
+	// Whether to show the divergence from the base branch in the branches view.
+	// One of: 'none' | 'onlyArrow'  | 'arrowAndNumber'
+	ShowDivergenceFromBaseBranch string `yaml:"showDivergenceFromBaseBranch" jsonschema:"enum=none,enum=onlyArrow,enum=arrowAndNumber"`
 	// Height of the command log view
 	CommandLogSize int `yaml:"commandLogSize" jsonschema:"minimum=0"`
 	// Whether to split the main window when viewing file changes.
@@ -152,6 +161,10 @@ type GuiConfig struct {
 	// Status panel view.
 	// One of 'dashboard' (default) | 'allBranchesLog'
 	StatusPanelView string `yaml:"statusPanelView" jsonschema:"enum=dashboard,enum=allBranchesLog"`
+	// If true, jump to the Files panel after popping a stash
+	SwitchToFilesAfterStashPop bool `yaml:"switchToFilesAfterStashPop"`
+	// If true, jump to the Files panel after applying a stash
+	SwitchToFilesAfterStashApply bool `yaml:"switchToFilesAfterStashApply"`
 }
 
 func (c *GuiConfig) UseFuzzySearch() bool {
@@ -170,6 +183,8 @@ type ThemeConfig struct {
 	// Background color of selected line.
 	// See https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#highlighting-the-selected-line
 	SelectedLineBgColor []string `yaml:"selectedLineBgColor" jsonschema:"minItems=1,uniqueItems=true"`
+	// Background color of selected line when view doesn't have focus.
+	InactiveViewSelectedLineBgColor []string `yaml:"inactiveViewSelectedLineBgColor" jsonschema:"minItems=1,uniqueItems=true"`
 	// Foreground color of copied commit
 	CherryPickedCommitFgColor []string `yaml:"cherryPickedCommitFgColor" jsonschema:"minItems=1,uniqueItems=true"`
 	// Background color of copied commit
@@ -213,10 +228,18 @@ type GitConfig struct {
 	AutoRefresh bool `yaml:"autoRefresh"`
 	// If true, pass the --all arg to git fetch
 	FetchAll bool `yaml:"fetchAll"`
+	// If true, lazygit will automatically stage files that used to have merge
+	// conflicts but no longer do; and it will also ask you if you want to
+	// continue a merge or rebase if you've resolved all conflicts. If false, it
+	// won't do either of these things.
+	AutoStageResolvedConflicts bool `yaml:"autoStageResolvedConflicts"`
 	// Command used when displaying the current branch git log in the main window
 	BranchLogCmd string `yaml:"branchLogCmd"`
-	// Command used to display git log of all branches in the main window
+	// Command used to display git log of all branches in the main window.
+	// Deprecated: User `allBranchesLogCmds` instead.
 	AllBranchesLogCmd string `yaml:"allBranchesLogCmd"`
+	// Commands used to display git log of all branches in the main window, they will be cycled in order of appearance
+	AllBranchesLogCmds []string `yaml:"allBranchesLogCmds"`
 	// If true, do not spawn a separate process when using GPG
 	OverrideGpg bool `yaml:"overrideGpg"`
 	// If true, do not allow force pushes
@@ -225,6 +248,8 @@ type GitConfig struct {
 	CommitPrefix *CommitPrefixConfig `yaml:"commitPrefix"`
 	// See https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#predefined-commit-message-prefix
 	CommitPrefixes map[string]CommitPrefixConfig `yaml:"commitPrefixes"`
+	// See https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#predefined-branch-name-prefix
+	BranchPrefix string `yaml:"branchPrefix"`
 	// If true, parse emoji strings in commit messages e.g. render :rocket: as 🚀
 	// (This should really be under 'gui', not 'git')
 	ParseEmoji bool `yaml:"parseEmoji"`
@@ -274,6 +299,8 @@ type MergingConfig struct {
 	ManualCommit bool `yaml:"manualCommit"`
 	// Extra args passed to `git merge`, e.g. --no-ff
 	Args string `yaml:"args" jsonschema:"example=--no-ff"`
+	// The commit message to use for a squash merge commit. Can contain "{{selectedRef}}" and "{{currentBranch}}" placeholders.
+	SquashMergeMessage string `yaml:"squashMergeMessage"`
 }
 
 type LogConfig struct {
@@ -323,73 +350,75 @@ type KeybindingConfig struct {
 
 // damn looks like we have some inconsistencies here with -alt and -alt1
 type KeybindingUniversalConfig struct {
-	Quit                         string   `yaml:"quit"`
-	QuitAlt1                     string   `yaml:"quit-alt1"`
-	Return                       string   `yaml:"return"`
-	QuitWithoutChangingDirectory string   `yaml:"quitWithoutChangingDirectory"`
-	TogglePanel                  string   `yaml:"togglePanel"`
-	PrevItem                     string   `yaml:"prevItem"`
-	NextItem                     string   `yaml:"nextItem"`
-	PrevItemAlt                  string   `yaml:"prevItem-alt"`
-	NextItemAlt                  string   `yaml:"nextItem-alt"`
-	PrevPage                     string   `yaml:"prevPage"`
-	NextPage                     string   `yaml:"nextPage"`
-	ScrollLeft                   string   `yaml:"scrollLeft"`
-	ScrollRight                  string   `yaml:"scrollRight"`
-	GotoTop                      string   `yaml:"gotoTop"`
-	GotoBottom                   string   `yaml:"gotoBottom"`
-	ToggleRangeSelect            string   `yaml:"toggleRangeSelect"`
-	RangeSelectDown              string   `yaml:"rangeSelectDown"`
-	RangeSelectUp                string   `yaml:"rangeSelectUp"`
-	PrevBlock                    string   `yaml:"prevBlock"`
-	NextBlock                    string   `yaml:"nextBlock"`
-	PrevBlockAlt                 string   `yaml:"prevBlock-alt"`
-	NextBlockAlt                 string   `yaml:"nextBlock-alt"`
-	NextBlockAlt2                string   `yaml:"nextBlock-alt2"`
-	PrevBlockAlt2                string   `yaml:"prevBlock-alt2"`
-	JumpToBlock                  []string `yaml:"jumpToBlock"`
-	NextMatch                    string   `yaml:"nextMatch"`
-	PrevMatch                    string   `yaml:"prevMatch"`
-	StartSearch                  string   `yaml:"startSearch"`
-	OptionMenu                   string   `yaml:"optionMenu"`
-	OptionMenuAlt1               string   `yaml:"optionMenu-alt1"`
-	Select                       string   `yaml:"select"`
-	GoInto                       string   `yaml:"goInto"`
-	Confirm                      string   `yaml:"confirm"`
-	ConfirmInEditor              string   `yaml:"confirmInEditor"`
-	Remove                       string   `yaml:"remove"`
-	New                          string   `yaml:"new"`
-	Edit                         string   `yaml:"edit"`
-	OpenFile                     string   `yaml:"openFile"`
-	ScrollUpMain                 string   `yaml:"scrollUpMain"`
-	ScrollDownMain               string   `yaml:"scrollDownMain"`
-	ScrollUpMainAlt1             string   `yaml:"scrollUpMain-alt1"`
-	ScrollDownMainAlt1           string   `yaml:"scrollDownMain-alt1"`
-	ScrollUpMainAlt2             string   `yaml:"scrollUpMain-alt2"`
-	ScrollDownMainAlt2           string   `yaml:"scrollDownMain-alt2"`
-	ExecuteCustomCommand         string   `yaml:"executeCustomCommand"`
-	CreateRebaseOptionsMenu      string   `yaml:"createRebaseOptionsMenu"`
-	Push                         string   `yaml:"pushFiles"` // 'Files' appended for legacy reasons
-	Pull                         string   `yaml:"pullFiles"` // 'Files' appended for legacy reasons
-	Refresh                      string   `yaml:"refresh"`
-	CreatePatchOptionsMenu       string   `yaml:"createPatchOptionsMenu"`
-	NextTab                      string   `yaml:"nextTab"`
-	PrevTab                      string   `yaml:"prevTab"`
-	NextScreenMode               string   `yaml:"nextScreenMode"`
-	PrevScreenMode               string   `yaml:"prevScreenMode"`
-	Undo                         string   `yaml:"undo"`
-	Redo                         string   `yaml:"redo"`
-	FilteringMenu                string   `yaml:"filteringMenu"`
-	DiffingMenu                  string   `yaml:"diffingMenu"`
-	DiffingMenuAlt               string   `yaml:"diffingMenu-alt"`
-	CopyToClipboard              string   `yaml:"copyToClipboard"`
-	OpenRecentRepos              string   `yaml:"openRecentRepos"`
-	SubmitEditorText             string   `yaml:"submitEditorText"`
-	ExtrasMenu                   string   `yaml:"extrasMenu"`
-	ToggleWhitespaceInDiffView   string   `yaml:"toggleWhitespaceInDiffView"`
-	IncreaseContextInDiffView    string   `yaml:"increaseContextInDiffView"`
-	DecreaseContextInDiffView    string   `yaml:"decreaseContextInDiffView"`
-	OpenDiffTool                 string   `yaml:"openDiffTool"`
+	Quit                              string   `yaml:"quit"`
+	QuitAlt1                          string   `yaml:"quit-alt1"`
+	Return                            string   `yaml:"return"`
+	QuitWithoutChangingDirectory      string   `yaml:"quitWithoutChangingDirectory"`
+	TogglePanel                       string   `yaml:"togglePanel"`
+	PrevItem                          string   `yaml:"prevItem"`
+	NextItem                          string   `yaml:"nextItem"`
+	PrevItemAlt                       string   `yaml:"prevItem-alt"`
+	NextItemAlt                       string   `yaml:"nextItem-alt"`
+	PrevPage                          string   `yaml:"prevPage"`
+	NextPage                          string   `yaml:"nextPage"`
+	ScrollLeft                        string   `yaml:"scrollLeft"`
+	ScrollRight                       string   `yaml:"scrollRight"`
+	GotoTop                           string   `yaml:"gotoTop"`
+	GotoBottom                        string   `yaml:"gotoBottom"`
+	ToggleRangeSelect                 string   `yaml:"toggleRangeSelect"`
+	RangeSelectDown                   string   `yaml:"rangeSelectDown"`
+	RangeSelectUp                     string   `yaml:"rangeSelectUp"`
+	PrevBlock                         string   `yaml:"prevBlock"`
+	NextBlock                         string   `yaml:"nextBlock"`
+	PrevBlockAlt                      string   `yaml:"prevBlock-alt"`
+	NextBlockAlt                      string   `yaml:"nextBlock-alt"`
+	NextBlockAlt2                     string   `yaml:"nextBlock-alt2"`
+	PrevBlockAlt2                     string   `yaml:"prevBlock-alt2"`
+	JumpToBlock                       []string `yaml:"jumpToBlock"`
+	NextMatch                         string   `yaml:"nextMatch"`
+	PrevMatch                         string   `yaml:"prevMatch"`
+	StartSearch                       string   `yaml:"startSearch"`
+	OptionMenu                        string   `yaml:"optionMenu"`
+	OptionMenuAlt1                    string   `yaml:"optionMenu-alt1"`
+	Select                            string   `yaml:"select"`
+	GoInto                            string   `yaml:"goInto"`
+	Confirm                           string   `yaml:"confirm"`
+	ConfirmInEditor                   string   `yaml:"confirmInEditor"`
+	Remove                            string   `yaml:"remove"`
+	New                               string   `yaml:"new"`
+	Edit                              string   `yaml:"edit"`
+	OpenFile                          string   `yaml:"openFile"`
+	ScrollUpMain                      string   `yaml:"scrollUpMain"`
+	ScrollDownMain                    string   `yaml:"scrollDownMain"`
+	ScrollUpMainAlt1                  string   `yaml:"scrollUpMain-alt1"`
+	ScrollDownMainAlt1                string   `yaml:"scrollDownMain-alt1"`
+	ScrollUpMainAlt2                  string   `yaml:"scrollUpMain-alt2"`
+	ScrollDownMainAlt2                string   `yaml:"scrollDownMain-alt2"`
+	ExecuteShellCommand               string   `yaml:"executeShellCommand"`
+	CreateRebaseOptionsMenu           string   `yaml:"createRebaseOptionsMenu"`
+	Push                              string   `yaml:"pushFiles"` // 'Files' appended for legacy reasons
+	Pull                              string   `yaml:"pullFiles"` // 'Files' appended for legacy reasons
+	Refresh                           string   `yaml:"refresh"`
+	CreatePatchOptionsMenu            string   `yaml:"createPatchOptionsMenu"`
+	NextTab                           string   `yaml:"nextTab"`
+	PrevTab                           string   `yaml:"prevTab"`
+	NextScreenMode                    string   `yaml:"nextScreenMode"`
+	PrevScreenMode                    string   `yaml:"prevScreenMode"`
+	Undo                              string   `yaml:"undo"`
+	Redo                              string   `yaml:"redo"`
+	FilteringMenu                     string   `yaml:"filteringMenu"`
+	DiffingMenu                       string   `yaml:"diffingMenu"`
+	DiffingMenuAlt                    string   `yaml:"diffingMenu-alt"`
+	CopyToClipboard                   string   `yaml:"copyToClipboard"`
+	OpenRecentRepos                   string   `yaml:"openRecentRepos"`
+	SubmitEditorText                  string   `yaml:"submitEditorText"`
+	ExtrasMenu                        string   `yaml:"extrasMenu"`
+	ToggleWhitespaceInDiffView        string   `yaml:"toggleWhitespaceInDiffView"`
+	IncreaseContextInDiffView         string   `yaml:"increaseContextInDiffView"`
+	DecreaseContextInDiffView         string   `yaml:"decreaseContextInDiffView"`
+	IncreaseRenameSimilarityThreshold string   `yaml:"increaseRenameSimilarityThreshold"`
+	DecreaseRenameSimilarityThreshold string   `yaml:"decreaseRenameSimilarityThreshold"`
+	OpenDiffTool                      string   `yaml:"openDiffTool"`
 }
 
 type KeybindingStatusConfig struct {
@@ -521,7 +550,7 @@ type OSConfig struct {
 
 	// A built-in preset that sets all of the above settings. Supported presets
 	// are defined in the getPreset function in editor_presets.go.
-	EditPreset string `yaml:"editPreset,omitempty" jsonschema:"example=vim,example=nvim,example=emacs,example=nano,example=vscode,example=sublime,example=kakoune,example=helix,example=xcode"`
+	EditPreset string `yaml:"editPreset,omitempty" jsonschema:"example=vim,example=nvim,example=emacs,example=nano,example=vscode,example=sublime,example=kakoune,example=helix,example=xcode,example=zed"`
 
 	// Command for opening a file, as if the file is double-clicked. Should
 	// contain "{{filename}}", but doesn't support "{{line}}".
@@ -554,8 +583,12 @@ type OSConfig struct {
 	OpenLinkCommand string `yaml:"openLinkCommand,omitempty"`
 
 	// CopyToClipboardCmd is the command for copying to clipboard.
-	// See https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#custom-command-for-copying-to-clipboard
+	// See https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#custom-command-for-copying-to-and-pasting-from-clipboard
 	CopyToClipboardCmd string `yaml:"copyToClipboardCmd,omitempty"`
+
+	// ReadFromClipboardCmd is the command for reading the clipboard.
+	// See https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#custom-command-for-copying-to-and-pasting-from-clipboard
+	ReadFromClipboardCmd string `yaml:"readFromClipboardCmd,omitempty"`
 }
 
 type CustomCommandAfterHook struct {
@@ -652,50 +685,57 @@ func GetDefaultConfig() *UserConfig {
 			SkipStashWarning:         false,
 			SidePanelWidth:           0.3333,
 			ExpandFocusedSidePanel:   false,
+			ExpandedSidePanelWeight:  2,
 			MainPanelSplitMode:       "flexible",
 			EnlargedSideViewLocation: "left",
 			Language:                 "auto",
 			TimeFormat:               "02 Jan 06",
 			ShortTimeFormat:          time.Kitchen,
 			Theme: ThemeConfig{
-				ActiveBorderColor:          []string{"green", "bold"},
-				SearchingActiveBorderColor: []string{"cyan", "bold"},
-				InactiveBorderColor:        []string{"default"},
-				OptionsTextColor:           []string{"blue"},
-				SelectedLineBgColor:        []string{"blue"},
-				CherryPickedCommitBgColor:  []string{"cyan"},
-				CherryPickedCommitFgColor:  []string{"blue"},
-				MarkedBaseCommitBgColor:    []string{"yellow"},
-				MarkedBaseCommitFgColor:    []string{"blue"},
-				UnstagedChangesColor:       []string{"red"},
-				DefaultFgColor:             []string{"default"},
+				ActiveBorderColor:               []string{"green", "bold"},
+				SearchingActiveBorderColor:      []string{"cyan", "bold"},
+				InactiveBorderColor:             []string{"default"},
+				OptionsTextColor:                []string{"blue"},
+				SelectedLineBgColor:             []string{"blue"},
+				InactiveViewSelectedLineBgColor: []string{"bold"},
+				CherryPickedCommitBgColor:       []string{"cyan"},
+				CherryPickedCommitFgColor:       []string{"blue"},
+				MarkedBaseCommitBgColor:         []string{"yellow"},
+				MarkedBaseCommitFgColor:         []string{"blue"},
+				UnstagedChangesColor:            []string{"red"},
+				DefaultFgColor:                  []string{"default"},
 			},
-			CommitLength:              CommitLengthConfig{Show: true},
-			SkipNoStagedFilesWarning:  false,
-			ShowListFooter:            true,
-			ShowCommandLog:            true,
-			ShowBottomLine:            true,
-			ShowPanelJumps:            true,
-			ShowFileTree:              true,
-			ShowRandomTip:             true,
-			ShowIcons:                 false,
-			NerdFontsVersion:          "",
-			ShowFileIcons:             true,
-			CommitHashLength:          8,
-			ShowBranchCommitHash:      false,
-			CommandLogSize:            8,
-			SplitDiff:                 "auto",
-			SkipRewordInEditorWarning: false,
-			WindowSize:                "normal",
-			Border:                    "rounded",
-			AnimateExplosion:          true,
-			PortraitMode:              "auto",
-			FilterMode:                "substring",
+			CommitLength:                 CommitLengthConfig{Show: true},
+			SkipNoStagedFilesWarning:     false,
+			ShowListFooter:               true,
+			ShowCommandLog:               true,
+			ShowBottomLine:               true,
+			ShowPanelJumps:               true,
+			ShowFileTree:                 true,
+			ShowRandomTip:                true,
+			ShowIcons:                    false,
+			NerdFontsVersion:             "",
+			ShowFileIcons:                true,
+			CommitAuthorShortLength:      2,
+			CommitAuthorLongLength:       17,
+			CommitHashLength:             8,
+			ShowBranchCommitHash:         false,
+			ShowDivergenceFromBaseBranch: "none",
+			CommandLogSize:               8,
+			SplitDiff:                    "auto",
+			SkipRewordInEditorWarning:    false,
+			WindowSize:                   "normal",
+			Border:                       "rounded",
+			AnimateExplosion:             true,
+			PortraitMode:                 "auto",
+			FilterMode:                   "substring",
 			Spinner: SpinnerConfig{
 				Frames: []string{"|", "/", "-", "\\"},
 				Rate:   50,
 			},
-			StatusPanelView: "dashboard",
+			StatusPanelView:              "dashboard",
+			SwitchToFilesAfterStashPop:   true,
+			SwitchToFilesAfterStashApply: true,
 		},
 		Git: GitConfig{
 			Paging: PagingConfig{
@@ -710,8 +750,9 @@ func GetDefaultConfig() *UserConfig {
 				AutoWrapWidth:         72,
 			},
 			Merging: MergingConfig{
-				ManualCommit: false,
-				Args:         "",
+				ManualCommit:       false,
+				Args:               "",
+				SquashMergeMessage: "Squash merge {{selectedRef}} into {{currentBranch}}",
 			},
 			Log: LogConfig{
 				Order:          "topo-order",
@@ -723,10 +764,12 @@ func GetDefaultConfig() *UserConfig {
 			AutoFetch:                    true,
 			AutoRefresh:                  true,
 			FetchAll:                     true,
+			AutoStageResolvedConflicts:   true,
 			BranchLogCmd:                 "git log --graph --color=always --abbrev-commit --decorate --date=relative --pretty=medium {{branchName}} --",
 			AllBranchesLogCmd:            "git log --graph --all --color=always --abbrev-commit --decorate --date=relative  --pretty=medium",
 			DisableForcePushing:          false,
 			CommitPrefixes:               map[string]CommitPrefixConfig(nil),
+			BranchPrefix:                 "",
 			ParseEmoji:                   false,
 			TruncateCopiedCommitHashesTo: 12,
 		},
@@ -748,73 +791,75 @@ func GetDefaultConfig() *UserConfig {
 		PromptToReturnFromSubprocess: true,
 		Keybinding: KeybindingConfig{
 			Universal: KeybindingUniversalConfig{
-				Quit:                         "q",
-				QuitAlt1:                     "<c-c>",
-				Return:                       "<esc>",
-				QuitWithoutChangingDirectory: "Q",
-				TogglePanel:                  "<tab>",
-				PrevItem:                     "<up>",
-				NextItem:                     "<down>",
-				PrevItemAlt:                  "k",
-				NextItemAlt:                  "j",
-				PrevPage:                     ",",
-				NextPage:                     ".",
-				ScrollLeft:                   "H",
-				ScrollRight:                  "L",
-				GotoTop:                      "<",
-				GotoBottom:                   ">",
-				ToggleRangeSelect:            "v",
-				RangeSelectDown:              "<s-down>",
-				RangeSelectUp:                "<s-up>",
-				PrevBlock:                    "<left>",
-				NextBlock:                    "<right>",
-				PrevBlockAlt:                 "h",
-				NextBlockAlt:                 "l",
-				PrevBlockAlt2:                "<backtab>",
-				NextBlockAlt2:                "<tab>",
-				JumpToBlock:                  []string{"1", "2", "3", "4", "5"},
-				NextMatch:                    "n",
-				PrevMatch:                    "N",
-				StartSearch:                  "/",
-				OptionMenu:                   "<disabled>",
-				OptionMenuAlt1:               "?",
-				Select:                       "<space>",
-				GoInto:                       "<enter>",
-				Confirm:                      "<enter>",
-				ConfirmInEditor:              "<a-enter>",
-				Remove:                       "d",
-				New:                          "n",
-				Edit:                         "e",
-				OpenFile:                     "o",
-				OpenRecentRepos:              "<c-r>",
-				ScrollUpMain:                 "<pgup>",
-				ScrollDownMain:               "<pgdown>",
-				ScrollUpMainAlt1:             "K",
-				ScrollDownMainAlt1:           "J",
-				ScrollUpMainAlt2:             "<c-u>",
-				ScrollDownMainAlt2:           "<c-d>",
-				ExecuteCustomCommand:         ":",
-				CreateRebaseOptionsMenu:      "m",
-				Push:                         "P",
-				Pull:                         "p",
-				Refresh:                      "R",
-				CreatePatchOptionsMenu:       "<c-p>",
-				NextTab:                      "]",
-				PrevTab:                      "[",
-				NextScreenMode:               "+",
-				PrevScreenMode:               "_",
-				Undo:                         "z",
-				Redo:                         "<c-z>",
-				FilteringMenu:                "<c-s>",
-				DiffingMenu:                  "W",
-				DiffingMenuAlt:               "<c-e>",
-				CopyToClipboard:              "<c-o>",
-				SubmitEditorText:             "<enter>",
-				ExtrasMenu:                   "@",
-				ToggleWhitespaceInDiffView:   "<c-w>",
-				IncreaseContextInDiffView:    "}",
-				DecreaseContextInDiffView:    "{",
-				OpenDiffTool:                 "<c-t>",
+				Quit:                              "q",
+				QuitAlt1:                          "<c-c>",
+				Return:                            "<esc>",
+				QuitWithoutChangingDirectory:      "Q",
+				TogglePanel:                       "<tab>",
+				PrevItem:                          "<up>",
+				NextItem:                          "<down>",
+				PrevItemAlt:                       "k",
+				NextItemAlt:                       "j",
+				PrevPage:                          ",",
+				NextPage:                          ".",
+				ScrollLeft:                        "H",
+				ScrollRight:                       "L",
+				GotoTop:                           "<",
+				GotoBottom:                        ">",
+				ToggleRangeSelect:                 "v",
+				RangeSelectDown:                   "<s-down>",
+				RangeSelectUp:                     "<s-up>",
+				PrevBlock:                         "<left>",
+				NextBlock:                         "<right>",
+				PrevBlockAlt:                      "h",
+				NextBlockAlt:                      "l",
+				PrevBlockAlt2:                     "<backtab>",
+				NextBlockAlt2:                     "<tab>",
+				JumpToBlock:                       []string{"1", "2", "3", "4", "5"},
+				NextMatch:                         "n",
+				PrevMatch:                         "N",
+				StartSearch:                       "/",
+				OptionMenu:                        "<disabled>",
+				OptionMenuAlt1:                    "?",
+				Select:                            "<space>",
+				GoInto:                            "<enter>",
+				Confirm:                           "<enter>",
+				ConfirmInEditor:                   "<a-enter>",
+				Remove:                            "d",
+				New:                               "n",
+				Edit:                              "e",
+				OpenFile:                          "o",
+				OpenRecentRepos:                   "<c-r>",
+				ScrollUpMain:                      "<pgup>",
+				ScrollDownMain:                    "<pgdown>",
+				ScrollUpMainAlt1:                  "K",
+				ScrollDownMainAlt1:                "J",
+				ScrollUpMainAlt2:                  "<c-u>",
+				ScrollDownMainAlt2:                "<c-d>",
+				ExecuteShellCommand:               ":",
+				CreateRebaseOptionsMenu:           "m",
+				Push:                              "P",
+				Pull:                              "p",
+				Refresh:                           "R",
+				CreatePatchOptionsMenu:            "<c-p>",
+				NextTab:                           "]",
+				PrevTab:                           "[",
+				NextScreenMode:                    "+",
+				PrevScreenMode:                    "_",
+				Undo:                              "z",
+				Redo:                              "<c-z>",
+				FilteringMenu:                     "<c-s>",
+				DiffingMenu:                       "W",
+				DiffingMenuAlt:                    "<c-e>",
+				CopyToClipboard:                   "<c-o>",
+				SubmitEditorText:                  "<enter>",
+				ExtrasMenu:                        "@",
+				ToggleWhitespaceInDiffView:        "<c-w>",
+				IncreaseContextInDiffView:         "}",
+				DecreaseContextInDiffView:         "{",
+				IncreaseRenameSimilarityThreshold: ")",
+				DecreaseRenameSimilarityThreshold: "(",
+				OpenDiffTool:                      "<c-t>",
 			},
 			Status: KeybindingStatusConfig{
 				CheckForUpdate:      "u",

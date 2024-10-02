@@ -35,10 +35,6 @@ type IGuiCommon interface {
 	// case would be overkill, although refresh will internally call 'PostRefreshUpdate'
 	PostRefreshUpdate(Context) error
 
-	// a generic click handler that can be used for any view; it handles opening
-	// URLs in the browser when the user clicks on one
-	HandleGenericClick(view *gocui.View) error
-
 	// renders string to a view without resetting its origin
 	SetViewContent(view *gocui.View, content string)
 	// resets cursor and origin of view. Often used before calling SetViewContent
@@ -49,7 +45,7 @@ type IGuiCommon interface {
 	// allows rendering to main views (i.e. the ones to the right of the side panel)
 	// in such a way that avoids concurrency issues when there are slow commands
 	// to display the output of
-	RenderToMainViews(opts RefreshMainOpts) error
+	RenderToMainViews(opts RefreshMainOpts)
 	// used purely for the sake of RenderToMainViews to provide the pair of main views we want to render to
 	MainViewPairs() MainViewPairs
 
@@ -57,22 +53,8 @@ type IGuiCommon interface {
 	RunSubprocess(cmdObj oscommands.ICmdObj) (bool, error)
 	RunSubprocessAndRefresh(oscommands.ICmdObj) error
 
-	PushContext(context Context, opts ...OnFocusOpts) error
-	PopContext() error
-	ReplaceContext(context Context) error
-	// Removes all given contexts from the stack. If a given context is not in the stack, it is ignored.
-	// This is for when you have a group of contexts that are bundled together e.g. with the commit message panel.
-	// If you want to remove a single context, you should probably use PopContext instead.
-	RemoveContexts([]Context) error
-	CurrentContext() Context
-	CurrentStaticContext() Context
-	CurrentSideContext() Context
-	IsCurrentContext(Context) bool
-	// TODO: replace the above context-based methods with just using Context() e.g. replace PushContext() with Context().Push()
 	Context() IContextMgr
 	ContextForKey(key ContextKey) Context
-
-	ActivateContext(context Context) error
 
 	GetConfig() config.AppConfigurer
 	GetAppState() *config.AppState
@@ -116,6 +98,8 @@ type IGuiCommon interface {
 	KeybindingsOpts() KeybindingsOpts
 	CallKeybindingHandler(binding *Binding) error
 
+	ResetKeybindings() error
+
 	// hopefully we can remove this once we've moved all our keybinding stuff out of the gui god struct.
 	GetInitialKeybindingsWithCustomCommands() ([]*Binding, []*gocui.ViewMouseBinding)
 
@@ -136,11 +120,11 @@ type IPopupHandler interface {
 	// Shows a notification popup with the given title and message to the user.
 	//
 	// This is a convenience wrapper around Confirm(), thus the popup can be closed using both 'Enter' and 'ESC'.
-	Alert(title string, message string) error
+	Alert(title string, message string)
 	// Shows a popup asking the user for confirmation.
-	Confirm(opts ConfirmOpts) error
+	Confirm(opts ConfirmOpts)
 	// Shows a popup prompting the user for input.
-	Prompt(opts PromptOpts) error
+	Prompt(opts PromptOpts)
 	WithWaitingStatus(message string, f func(gocui.Task) error) error
 	WithWaitingStatusSync(message string, f func() error) error
 	Menu(opts CreateMenuOptions) error
@@ -159,6 +143,7 @@ const (
 
 type CreateMenuOptions struct {
 	Title           string
+	Prompt          string // a message that will be displayed above the menu options
 	Items           []*MenuItem
 	HideCancel      bool
 	ColumnAlignment []utils.Alignment
@@ -216,6 +201,30 @@ type DisabledReason struct {
 	ShowErrorInPanel bool
 }
 
+type MenuWidget int
+
+const (
+	MenuWidgetNone MenuWidget = iota
+	MenuWidgetRadioButtonSelected
+	MenuWidgetRadioButtonUnselected
+	MenuWidgetCheckboxSelected
+	MenuWidgetCheckboxUnselected
+)
+
+func MakeMenuRadioButton(value bool) MenuWidget {
+	if value {
+		return MenuWidgetRadioButtonSelected
+	}
+	return MenuWidgetRadioButtonUnselected
+}
+
+func MakeMenuCheckBox(value bool) MenuWidget {
+	if value {
+		return MenuWidgetCheckboxSelected
+	}
+	return MenuWidgetCheckboxUnselected
+}
+
 type MenuItem struct {
 	Label string
 
@@ -230,6 +239,12 @@ type MenuItem struct {
 	// If Key is defined it allows the user to press the key to invoke the menu
 	// item, as opposed to having to navigate to it
 	Key Key
+
+	// A widget to show in front of the menu item. Supported widget types are
+	// checkboxes and radio buttons,
+	// This only handles the rendering of the widget; the behavior needs to be
+	// provided by the client.
+	Widget MenuWidget
 
 	// The tooltip will be displayed upon highlighting the menu item
 	Tooltip string
@@ -280,6 +295,8 @@ type Model struct {
 	// Name of the currently checked out branch. This will be set even when
 	// we're on a detached head because we're rebasing or bisecting.
 	CheckedOutBranch string
+
+	MainBranches *git_commands.MainBranches
 
 	// for displaying suggestions while typing in a file name
 	FilesTrie *patricia.Trie

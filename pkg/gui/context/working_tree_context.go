@@ -1,6 +1,7 @@
 package context
 
 import (
+	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/gui/filetree"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
@@ -15,17 +16,20 @@ type WorkingTreeContext struct {
 	*SearchTrait
 }
 
-var _ types.IListContext = (*WorkingTreeContext)(nil)
+var (
+	_ types.IListContext       = (*WorkingTreeContext)(nil)
+	_ types.ISearchableContext = (*WorkingTreeContext)(nil)
+)
 
 func NewWorkingTreeContext(c *ContextCommon) *WorkingTreeContext {
 	viewModel := filetree.NewFileTreeViewModel(
 		func() []*models.File { return c.Model().Files },
 		c.Log,
-		c.UserConfig.Gui.ShowFileTree,
+		c.UserConfig().Gui.ShowFileTree,
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
-		showFileIcons := icons.IsIconEnabled() && c.UserConfig.Gui.ShowFileIcons
+		showFileIcons := icons.IsIconEnabled() && c.UserConfig().Gui.ShowFileIcons
 		lines := presentation.RenderFileTree(viewModel, c.Model().Submodules, showFileIcons)
 		return lo.Map(lines, func(line string, _ int) []string {
 			return []string{line}
@@ -51,10 +55,11 @@ func NewWorkingTreeContext(c *ContextCommon) *WorkingTreeContext {
 		},
 	}
 
-	ctx.GetView().SetOnSelectItem(ctx.SearchTrait.onSelectItemWrapper(func(selectedLineIdx int) error {
-		ctx.GetList().SetSelection(selectedLineIdx)
-		return ctx.HandleFocus(types.OnFocusOpts{})
-	}))
+	ctx.GetView().SetOnSelectItem(ctx.SearchTrait.onSelectItemWrapper(ctx.OnSearchSelect))
 
 	return ctx
+}
+
+func (self *WorkingTreeContext) ModelSearchResults(searchStr string, caseSensitive bool) []gocui.SearchPosition {
+	return nil
 }

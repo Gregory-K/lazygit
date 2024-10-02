@@ -101,10 +101,7 @@ func (self *CommitsHelper) SwitchToEditor() error {
 		return err
 	}
 
-	err = self.CloseCommitMessagePanel()
-	if err != nil {
-		return err
-	}
+	self.CloseCommitMessagePanel()
 
 	return self.c.Contexts().CommitMessage.SwitchToEditor(filepath)
 }
@@ -134,11 +131,9 @@ type OpenCommitMessagePanelOpts struct {
 	InitialMessage   string
 }
 
-func (self *CommitsHelper) OpenCommitMessagePanel(opts *OpenCommitMessagePanelOpts) error {
+func (self *CommitsHelper) OpenCommitMessagePanel(opts *OpenCommitMessagePanelOpts) {
 	onConfirm := func(summary string, description string) error {
-		if err := self.CloseCommitMessagePanel(); err != nil {
-			return err
-		}
+		self.CloseCommitMessagePanel()
 
 		return opts.OnConfirm(summary, description)
 	}
@@ -154,7 +149,7 @@ func (self *CommitsHelper) OpenCommitMessagePanel(opts *OpenCommitMessagePanelOp
 
 	self.UpdateCommitPanelView(opts.InitialMessage)
 
-	return self.pushCommitMessageContexts()
+	self.c.Context().Push(self.c.Contexts().CommitMessage)
 }
 
 func (self *CommitsHelper) OnCommitSuccess() {
@@ -179,7 +174,7 @@ func (self *CommitsHelper) HandleCommitConfirm() error {
 	return nil
 }
 
-func (self *CommitsHelper) CloseCommitMessagePanel() error {
+func (self *CommitsHelper) CloseCommitMessagePanel() {
 	if self.c.Contexts().CommitMessage.GetPreserveMessage() {
 		message := self.JoinCommitMessageAndUnwrappedDescription()
 
@@ -190,28 +185,10 @@ func (self *CommitsHelper) CloseCommitMessagePanel() error {
 
 	self.c.Contexts().CommitMessage.SetHistoryMessage("")
 
-	return self.PopCommitMessageContexts()
-}
+	self.c.Views().CommitMessage.Visible = false
+	self.c.Views().CommitDescription.Visible = false
 
-func (self *CommitsHelper) PopCommitMessageContexts() error {
-	return self.c.RemoveContexts(self.commitMessageContexts())
-}
-
-func (self *CommitsHelper) pushCommitMessageContexts() error {
-	for _, context := range self.commitMessageContexts() {
-		if err := self.c.PushContext(context); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (self *CommitsHelper) commitMessageContexts() []types.Context {
-	return []types.Context{
-		self.c.Contexts().CommitDescription,
-		self.c.Contexts().CommitMessage,
-	}
+	self.c.Context().Pop()
 }
 
 func (self *CommitsHelper) OpenCommitMenu(suggestionFunc func(string) []*types.Suggestion) error {
@@ -238,6 +215,13 @@ func (self *CommitsHelper) OpenCommitMenu(suggestionFunc func(string) []*types.S
 			},
 			Key: 'c',
 		},
+		{
+			Label: self.c.Tr.PasteCommitMessageFromClipboard,
+			OnPress: func() error {
+				return self.pasteCommitMessageFromClipboard()
+			},
+			Key: 'p',
+		},
 	}
 	return self.c.Menu(types.CreateMenuOptions{
 		Title: self.c.Tr.CommitMenuTitle,
@@ -246,7 +230,7 @@ func (self *CommitsHelper) OpenCommitMenu(suggestionFunc func(string) []*types.S
 }
 
 func (self *CommitsHelper) addCoAuthor(suggestionFunc func(string) []*types.Suggestion) error {
-	return self.c.Prompt(types.PromptOpts{
+	self.c.Prompt(types.PromptOpts{
 		Title:               self.c.Tr.AddCoAuthorPromptTitle,
 		FindSuggestionsFunc: suggestionFunc,
 		HandleConfirm: func(value string) error {
@@ -256,4 +240,33 @@ func (self *CommitsHelper) addCoAuthor(suggestionFunc func(string) []*types.Sugg
 			return nil
 		},
 	})
+
+	return nil
+}
+
+func (self *CommitsHelper) pasteCommitMessageFromClipboard() error {
+	message, err := self.c.OS().PasteFromClipboard()
+	if err != nil {
+		return err
+	}
+	if message == "" {
+		return nil
+	}
+
+	if currentMessage := self.JoinCommitMessageAndUnwrappedDescription(); currentMessage == "" {
+		self.SetMessageAndDescriptionInView(message)
+		return nil
+	}
+
+	// Confirm before overwriting the commit message
+	self.c.Confirm(types.ConfirmOpts{
+		Title:  self.c.Tr.PasteCommitMessageFromClipboard,
+		Prompt: self.c.Tr.SurePasteCommitMessage,
+		HandleConfirm: func() error {
+			self.SetMessageAndDescriptionInView(message)
+			return nil
+		},
+	})
+
+	return nil
 }

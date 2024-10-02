@@ -33,9 +33,9 @@ func NewReflogCommitsContext(c *ContextCommon) *ReflogCommitsContext {
 			c.Modes().CherryPicking.SelectedHashSet(),
 			c.Modes().Diffing.Ref,
 			time.Now(),
-			c.UserConfig.Gui.TimeFormat,
-			c.UserConfig.Gui.ShortTimeFormat,
-			c.UserConfig.Git.ParseEmoji,
+			c.UserConfig().Gui.TimeFormat,
+			c.UserConfig().Gui.ShortTimeFormat,
+			c.UserConfig().Git.ParseEmoji,
 		)
 	}
 
@@ -48,7 +48,7 @@ func NewReflogCommitsContext(c *ContextCommon) *ReflogCommitsContext {
 				Key:                        REFLOG_COMMITS_CONTEXT_KEY,
 				Kind:                       types.SIDE_CONTEXT,
 				Focusable:                  true,
-				NeedsRerenderOnWidthChange: true,
+				NeedsRerenderOnWidthChange: types.NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_SCREEN_MODE_CHANGES,
 			})),
 			ListRenderer: ListRenderer{
 				list:              viewModel,
@@ -69,6 +69,11 @@ func (self *ReflogCommitsContext) GetSelectedRef() types.Ref {
 		return nil
 	}
 	return commit
+}
+
+func (self *ReflogCommitsContext) GetSelectedRefRangeForDiffFiles() *types.RefRange {
+	// It doesn't make much sense to show a range diff between two reflog entries.
+	return nil
 }
 
 func (self *ReflogCommitsContext) GetCommits() []*models.Commit {

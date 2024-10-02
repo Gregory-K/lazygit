@@ -32,7 +32,7 @@ func NewBranchesContext(c *ContextCommon) *BranchesContext {
 			c.Modes().Diffing.Ref,
 			c.Views().Branches.Width(),
 			c.Tr,
-			c.UserConfig,
+			c.UserConfig(),
 			c.Model().Worktrees,
 		)
 	}
@@ -46,7 +46,7 @@ func NewBranchesContext(c *ContextCommon) *BranchesContext {
 				Key:                        LOCAL_BRANCHES_CONTEXT_KEY,
 				Kind:                       types.SIDE_CONTEXT,
 				Focusable:                  true,
-				NeedsRerenderOnWidthChange: true,
+				NeedsRerenderOnWidthChange: types.NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_WIDTH_CHANGES,
 			})),
 			ListRenderer: ListRenderer{
 				list:              viewModel,

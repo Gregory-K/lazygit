@@ -21,6 +21,7 @@ type GuiDriver struct {
 	gui        *Gui
 	isIdleChan chan struct{}
 	toastChan  chan string
+	headless   bool
 }
 
 var _ integrationTypes.GuiDriver = &GuiDriver{}
@@ -74,7 +75,7 @@ func (self *GuiDriver) Keys() config.KeybindingConfig {
 }
 
 func (self *GuiDriver) CurrentContext() types.Context {
-	return self.gui.c.CurrentContext()
+	return self.gui.c.Context().Current()
 }
 
 func (self *GuiDriver) ContextForView(viewName string) types.Context {
@@ -160,4 +161,8 @@ func (self *GuiDriver) NextToast() *string {
 	default:
 		return nil
 	}
+}
+
+func (self *GuiDriver) Headless() bool {
+	return self.headless
 }
