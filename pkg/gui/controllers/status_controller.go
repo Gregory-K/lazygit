@@ -6,9 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jesseduffield/gocui"
-	"github.com/jesseduffield/lazygit/pkg/commands/types/enums"
 	"github.com/jesseduffield/lazygit/pkg/constants"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
@@ -61,8 +60,13 @@ func (self *StatusController) GetKeybindings(opts types.KeybindingsOpts) []*type
 		},
 		{
 			Key:         opts.GetKey(opts.Config.Status.AllBranchesLogGraph),
-			Handler:     func() error { self.showAllBranchLogs(); return nil },
+			Handler:     func() error { self.switchToOrRotateAllBranchesLogs(); return nil },
 			Description: self.c.Tr.AllBranchesLogGraph,
+		},
+		{
+			Key:         opts.GetKey(opts.Config.Status.AllBranchesLogGraphReverse),
+			Handler:     func() error { self.switchToOrRotateAllBranchesLogsBackward(); return nil },
+			Description: self.c.Tr.AllBranchesLogGraphReverse,
 		},
 	}
 
@@ -104,24 +108,21 @@ func (self *StatusController) onClick(opts gocui.ViewMouseBindingOpts) error {
 		return nil
 	}
 
-	self.c.Context().Push(self.Context())
+	self.c.Context().Push(self.Context(), types.OnFocusOpts{})
 
 	upstreamStatus := utils.Decolorise(presentation.BranchStatus(currentBranch, types.ItemOperationNone, self.c.Tr, time.Now(), self.c.UserConfig()))
 	repoName := self.c.Git().RepoPaths.RepoName()
 	workingTreeState := self.c.Git().Status.WorkingTreeState()
-	switch workingTreeState {
-	case enums.REBASE_MODE_REBASING, enums.REBASE_MODE_MERGING:
-		workingTreeStatus := fmt.Sprintf("(%s)", presentation.FormatWorkingTreeStateLower(self.c.Tr, workingTreeState))
+	if workingTreeState.Any() {
+		workingTreeStatus := fmt.Sprintf("(%s)", workingTreeState.LowerCaseTitle(self.c.Tr))
 		if cursorInSubstring(opts.X, upstreamStatus+" ", workingTreeStatus) {
 			return self.c.Helpers().MergeAndRebase.CreateRebaseOptionsMenu()
 		}
 		if cursorInSubstring(opts.X, upstreamStatus+" "+workingTreeStatus+" ", repoName) {
 			return self.c.Helpers().Repos.CreateRecentReposMenu()
 		}
-	default:
-		if cursorInSubstring(opts.X, upstreamStatus+" ", repoName) {
-			return self.c.Helpers().Repos.CreateRecentReposMenu()
-		}
+	} else if cursorInSubstring(opts.X, upstreamStatus+" ", repoName) {
+		return self.c.Helpers().Repos.CreateRecentReposMenu()
 	}
 
 	return nil
@@ -185,13 +186,41 @@ func (self *StatusController) showAllBranchLogs() {
 	cmdObj := self.c.Git().Branch.AllBranchesLogCmdObj()
 	task := types.NewRunPtyTask(cmdObj.GetCmd())
 
+	title := self.c.Tr.LogTitle
+	if i, n := self.c.Git().Branch.GetAllBranchesLogIdxAndCount(); n > 1 {
+		title = fmt.Sprintf(self.c.Tr.LogXOfYTitle, i+1, n)
+	}
 	self.c.RenderToMainViews(types.RefreshMainOpts{
 		Pair: self.c.MainViewPairs().Normal,
 		Main: &types.ViewUpdateOpts{
-			Title: self.c.Tr.LogTitle,
+			Title: title,
 			Task:  task,
 		},
 	})
+}
+
+// Switches to the all branches view, or, if already on that view,
+// rotates to the next command in the list, and then renders it.
+func (self *StatusController) switchToOrRotateAllBranchesLogs() {
+	// A bit of a hack to ensure we only rotate to the next branch log command
+	// if we currently are looking at a branch log. Otherwise, we should just show
+	// the current index (if we are coming from the dashboard).
+	if self.c.Views().Main.Title != self.c.Tr.StatusTitle {
+		self.c.Git().Branch.RotateAllBranchesLogIdx()
+	}
+	self.showAllBranchLogs()
+}
+
+// Switches to the all branches view, or, if already on that view,
+// rotates to the previous command in the list, and then renders it.
+func (self *StatusController) switchToOrRotateAllBranchesLogsBackward() {
+	// A bit of a hack to ensure we only rotate to the previous branch log command
+	// if we currently are looking at a branch log. Otherwise, we should just show
+	// the current index (if we are coming from the dashboard).
+	if self.c.Views().Main.Title != self.c.Tr.StatusTitle {
+		self.c.Git().Branch.RotateAllBranchesLogIdxBackward()
+	}
+	self.showAllBranchLogs()
 }
 
 func (self *StatusController) showDashboard() {

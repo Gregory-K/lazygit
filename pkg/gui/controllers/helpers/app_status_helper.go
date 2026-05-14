@@ -3,9 +3,10 @@ package helpers
 import (
 	"time"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/status"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
+	"github.com/jesseduffield/lazygit/pkg/utils"
 )
 
 type AppStatusHelper struct {
@@ -57,12 +58,16 @@ func (self appStatusHelperTask) Continue() {
 	self.waitingStatusHandle.Show()
 }
 
-// withWaitingStatus wraps a function and shows a waiting status while the function is still executing
+// WithWaitingStatus wraps a function and shows a waiting status while the function is still executing
 func (self *AppStatusHelper) WithWaitingStatus(message string, f func(gocui.Task) error) {
 	self.c.OnWorker(func(task gocui.Task) error {
-		return self.statusMgr().WithWaitingStatus(message, self.renderAppStatus, func(waitingStatusHandle *status.WaitingStatusHandle) error {
-			return f(appStatusHelperTask{task, waitingStatusHandle})
-		})
+		return self.WithWaitingStatusImpl(message, f, task)
+	})
+}
+
+func (self *AppStatusHelper) WithWaitingStatusImpl(message string, f func(gocui.Task) error, task gocui.Task) error {
+	return self.statusMgr().WithWaitingStatus(message, self.renderAppStatus, func(waitingStatusHandle *status.WaitingStatusHandle) error {
+		return f(appStatusHelperTask{task, waitingStatusHandle})
 	})
 }
 
@@ -89,13 +94,24 @@ func (self *AppStatusHelper) renderAppStatus() {
 	self.c.OnWorker(func(_ gocui.Task) error {
 		ticker := time.NewTicker(time.Millisecond * time.Duration(self.c.UserConfig().Gui.Spinner.Rate))
 		defer ticker.Stop()
+		prevAppStatus := ""
 		for range ticker.C {
 			appStatus, color := self.statusMgr().GetStatusString(self.c.UserConfig())
-			self.c.Views().AppStatus.FgColor = color
-			self.c.OnUIThread(func() error {
+
+			update := self.c.OnUIThreadContentOnly
+			if utils.StringWidth(appStatus) != utils.StringWidth(prevAppStatus) {
+				// Need a full layout whenever the width of the status string changes. This can't
+				// happen during normal spinning because we validate that all spinner frames have
+				// the same width, so typically this will only be triggered at the beginning and end
+				// of a status, or if the status string changes midway for some reason.
+				update = self.c.OnUIThread
+			}
+			update(func() error {
+				self.c.Views().AppStatus.FgColor = color
 				self.c.SetViewContent(self.c.Views().AppStatus, appStatus)
 				return nil
 			})
+			prevAppStatus = appStatus
 
 			if appStatus == "" {
 				break
@@ -107,7 +123,7 @@ func (self *AppStatusHelper) renderAppStatus() {
 
 func (self *AppStatusHelper) renderAppStatusSync(stop chan struct{}) {
 	go func() {
-		ticker := time.NewTicker(time.Millisecond * 50)
+		ticker := time.NewTicker(time.Millisecond * time.Duration(self.c.UserConfig().Gui.Spinner.Rate))
 		defer ticker.Stop()
 
 		// Forcing a re-layout and redraw after we added the waiting status;
@@ -132,7 +148,7 @@ func (self *AppStatusHelper) renderAppStatusSync(stop chan struct{}) {
 					self.c.Views().AppStatus, self.c.Views().Options, self.c.Views().Information,
 					self.c.Views().StatusSpacer1, self.c.Views().StatusSpacer2,
 				}
-				_ = self.c.GocuiGui().ForceRedrawViews(bottomLineViews...)
+				_ = self.c.GocuiGui().ForceFlushViewsContentOnly(bottomLineViews)
 			case <-stop:
 				break outer
 			}

@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 )
 
@@ -12,7 +12,7 @@ type ScreenModeActions struct {
 func (self *ScreenModeActions) Next() error {
 	self.c.State().GetRepoState().SetScreenMode(
 		nextIntInCycle(
-			[]types.WindowMaximisation{types.SCREEN_NORMAL, types.SCREEN_HALF, types.SCREEN_FULL},
+			[]types.ScreenMode{types.SCREEN_NORMAL, types.SCREEN_HALF, types.SCREEN_FULL},
 			self.c.State().GetRepoState().GetScreenMode(),
 		),
 	)
@@ -24,7 +24,7 @@ func (self *ScreenModeActions) Next() error {
 func (self *ScreenModeActions) Prev() error {
 	self.c.State().GetRepoState().SetScreenMode(
 		prevIntInCycle(
-			[]types.WindowMaximisation{types.SCREEN_NORMAL, types.SCREEN_HALF, types.SCREEN_FULL},
+			[]types.ScreenMode{types.SCREEN_NORMAL, types.SCREEN_HALF, types.SCREEN_FULL},
 			self.c.State().GetRepoState().GetScreenMode(),
 		),
 	)
@@ -41,6 +41,11 @@ func (self *ScreenModeActions) rerenderViewsWithScreenModeDependentContent() {
 			self.rerenderView(context.GetView())
 		}
 	}
+
+	// Rerender the main view; for views that display a diff this is necessary in case a custom
+	// pager depends on the width of the view. For other views it isn't needed, but we don't bother
+	// making a distinction here, as rerendering the main view unnecessarily is not a big deal.
+	self.c.Context().CurrentSide().HandleRenderToMain()
 }
 
 func (self *ScreenModeActions) rerenderView(view *gocui.View) {
@@ -53,7 +58,7 @@ func (self *ScreenModeActions) rerenderView(view *gocui.View) {
 	context.HandleRender()
 }
 
-func nextIntInCycle(sl []types.WindowMaximisation, current types.WindowMaximisation) types.WindowMaximisation {
+func nextIntInCycle(sl []types.ScreenMode, current types.ScreenMode) types.ScreenMode {
 	for i, val := range sl {
 		if val == current {
 			if i == len(sl)-1 {
@@ -65,7 +70,7 @@ func nextIntInCycle(sl []types.WindowMaximisation, current types.WindowMaximisat
 	return sl[0]
 }
 
-func prevIntInCycle(sl []types.WindowMaximisation, current types.WindowMaximisation) types.WindowMaximisation {
+func prevIntInCycle(sl []types.ScreenMode, current types.ScreenMode) types.ScreenMode {
 	for i, val := range sl {
 		if val == current {
 			if i > 0 {

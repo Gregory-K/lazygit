@@ -14,8 +14,8 @@ import (
 // compatibility. We already did this for Commit.Sha, which was renamed to Hash.
 
 type Commit struct {
-	Hash          string // deprecated: use Sha
-	Sha           string
+	Hash          string
+	Sha           string // deprecated: use Hash
 	Name          string
 	Status        models.CommitStatus
 	Action        todo.TodoCommand
@@ -41,6 +41,12 @@ type File struct {
 	DisplayString           string
 	ShortStatus             string
 	IsWorktree              bool
+}
+
+type Submodule struct {
+	Name string
+	Path string
+	Url  string
 }
 
 type Branch struct {
@@ -70,6 +76,7 @@ type RemoteBranch struct {
 type Remote struct {
 	Name     string
 	Urls     []string
+	PushUrls []string
 	Branches []*RemoteBranch
 }
 

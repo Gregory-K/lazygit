@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/tasks"
 )
 
@@ -18,10 +18,13 @@ func (gui *Gui) newCmdTask(view *gocui.View, cmd *exec.Cmd, prefix string) error
 
 	manager := gui.getManager(view)
 
+	var r io.ReadCloser
 	start := func() (*exec.Cmd, io.Reader) {
-		r, err := cmd.StdoutPipe()
+		var err error
+		r, err = cmd.StdoutPipe()
 		if err != nil {
 			gui.c.Log.Error(err)
+			r = nil
 		}
 		cmd.Stderr = cmd.Stdout
 
@@ -32,8 +35,15 @@ func (gui *Gui) newCmdTask(view *gocui.View, cmd *exec.Cmd, prefix string) error
 		return cmd, r
 	}
 
+	onClose := func() {
+		if r != nil {
+			r.Close()
+			r = nil
+		}
+	}
+
 	linesToRead := gui.linesToReadFromCmdTask(view)
-	if err := manager.NewTask(manager.NewCmdTask(start, prefix, linesToRead, nil), cmdStr); err != nil {
+	if err := manager.NewTask(manager.NewCmdTask(start, prefix, linesToRead, onClose), cmdStr); err != nil {
 		gui.c.Log.Error(err)
 	}
 
@@ -53,9 +63,7 @@ func (gui *Gui) newStringTaskWithoutScroll(view *gocui.View, str string) error {
 		return nil
 	}
 
-	// Using empty key so that on subsequent calls we won't reset the view's origin.
-	// Note this means that we will be scrolling back to the top if we're switching from a different key
-	if err := manager.NewTask(f, ""); err != nil {
+	if err := manager.NewTask(f, manager.GetTaskKey()); err != nil {
 		return err
 	}
 
@@ -71,7 +79,7 @@ func (gui *Gui) newStringTaskWithScroll(view *gocui.View, str string, originX in
 		return nil
 	}
 
-	if err := manager.NewTask(f, ""); err != nil {
+	if err := manager.NewTask(f, manager.GetTaskKey()); err != nil {
 		return err
 	}
 

@@ -3,10 +3,9 @@ package gui
 import (
 	"fmt"
 	"runtime"
-	"strings"
 	"time"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 )
@@ -18,6 +17,9 @@ type BackgroundRoutineMgr struct {
 	// we typically want to pause some things that are running like background
 	// file refreshes
 	pauseBackgroundRefreshes bool
+
+	// a channel to trigger an immediate background fetch; we use this when switching repos
+	triggerFetch chan struct{}
 }
 
 func (self *BackgroundRoutineMgr) PauseBackgroundRefreshes(pause bool) {
@@ -41,7 +43,7 @@ func (self *BackgroundRoutineMgr) startBackgroundRoutines() {
 	if userConfig.Git.AutoRefresh {
 		refreshInterval := userConfig.Refresher.RefreshInterval
 		if refreshInterval > 0 {
-			go utils.Safe(func() { self.startBackgroundFilesRefresh(refreshInterval) })
+			go utils.Safe(self.startBackgroundFilesRefresh)
 		} else {
 			self.gui.c.Log.Errorf(
 				"Value of config option 'refresher.refreshInterval' (%d) is invalid, disabling auto-refresh",
@@ -50,7 +52,7 @@ func (self *BackgroundRoutineMgr) startBackgroundRoutines() {
 	}
 
 	if self.gui.Config.GetDebug() {
-		self.goEvery(time.Second*time.Duration(10), self.gui.stopChan, func() error {
+		self.goEvery(time.Second*time.Duration(10), self.gui.stopChan, func(_ bool) error {
 			formatBytes := func(b uint64) string {
 				const unit = 1000
 				if b < unit {
@@ -76,60 +78,94 @@ func (self *BackgroundRoutineMgr) startBackgroundRoutines() {
 func (self *BackgroundRoutineMgr) startBackgroundFetch() {
 	self.gui.waitForIntro.Wait()
 
-	isNew := self.gui.IsNewRepo
-	userConfig := self.gui.UserConfig()
-	if !isNew {
-		time.After(time.Duration(userConfig.Refresher.FetchInterval) * time.Second)
-	}
-	err := self.backgroundFetch()
-	if err != nil && strings.Contains(err.Error(), "exit status 128") && isNew {
-		self.gui.c.Alert(self.gui.c.Tr.NoAutomaticGitFetchTitle, self.gui.c.Tr.NoAutomaticGitFetchBody)
-	} else {
-		self.goEvery(time.Second*time.Duration(userConfig.Refresher.FetchInterval), self.gui.stopChan, func() error {
-			err := self.backgroundFetch()
-			self.gui.c.Render()
-			return err
+	fetch := func(firstTimeOrRetriggered bool) error {
+		// Do this on the UI thread so that we don't have to deal with synchronization around the
+		// access of the repo state.
+		self.gui.onUIThread(func() error {
+			// There's a race here, where we might be recording the time stamp for a different repo
+			// than where the fetch actually ran. It's not very likely though, and not harmful if it
+			// does happen; guarding against it would be more effort than it's worth.
+			self.gui.State.LastBackgroundFetchTime = time.Now()
+			return nil
 		})
+
+		if self.gui.UserConfig().Gui.ShowBottomLine || firstTimeOrRetriggered {
+			return self.gui.helpers.AppStatus.WithWaitingStatusImpl(self.gui.Tr.FetchingStatus, func(gocui.Task) error {
+				return self.backgroundFetch()
+			}, nil)
+		}
+
+		return self.backgroundFetch()
 	}
+
+	// We want an immediate fetch at startup, and since goEvery starts by
+	// waiting for the interval, we need to trigger one manually first
+	_ = fetch(true)
+
+	userConfig := self.gui.UserConfig()
+	self.triggerFetch = self.goEvery(userConfig.Refresher.FetchIntervalDuration(), self.gui.stopChan, fetch)
 }
 
-func (self *BackgroundRoutineMgr) startBackgroundFilesRefresh(refreshInterval int) {
+func (self *BackgroundRoutineMgr) startBackgroundFilesRefresh() {
 	self.gui.waitForIntro.Wait()
 
-	self.goEvery(time.Second*time.Duration(refreshInterval), self.gui.stopChan, func() error {
-		return self.gui.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.FILES}})
+	userConfig := self.gui.UserConfig()
+	self.goEvery(userConfig.Refresher.RefreshIntervalDuration(), self.gui.stopChan, func(_ bool) error {
+		self.gui.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.FILES}})
+		return nil
 	})
 }
 
-func (self *BackgroundRoutineMgr) goEvery(interval time.Duration, stop chan struct{}, function func() error) {
+// returns a channel that can be used to trigger the callback immediately
+func (self *BackgroundRoutineMgr) goEvery(interval time.Duration, stop chan struct{}, function func(bool) error) chan struct{} {
 	done := make(chan struct{})
+	retrigger := make(chan struct{})
 	go utils.Safe(func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
+		doit := func(retriggered bool) {
+			if self.pauseBackgroundRefreshes {
+				return
+			}
+			self.gui.c.OnWorker(func(gocui.Task) error {
+				_ = function(retriggered)
+				done <- struct{}{}
+				return nil
+			})
+			// waiting so that we don't bunch up refreshes if the refresh takes longer than the
+			// interval, or if a retrigger comes in while we're still processing a timer-based one
+			// (or vice versa)
+			<-done
+		}
 		for {
 			select {
 			case <-ticker.C:
-				if self.pauseBackgroundRefreshes {
-					continue
-				}
-				self.gui.c.OnWorker(func(gocui.Task) error {
-					_ = function()
-					done <- struct{}{}
-					return nil
-				})
-				// waiting so that we don't bunch up refreshes if the refresh takes longer than the interval
-				<-done
+				doit(false)
+			case <-retrigger:
+				ticker.Reset(interval)
+				doit(true)
 			case <-stop:
 				return
 			}
 		}
 	})
+	return retrigger
 }
 
 func (self *BackgroundRoutineMgr) backgroundFetch() (err error) {
 	err = self.gui.git.Sync.FetchBackground()
 
-	_ = self.gui.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.BRANCHES, types.COMMITS, types.REMOTES, types.TAGS}, Mode: types.ASYNC})
+	self.gui.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.BRANCHES, types.COMMITS, types.REMOTES, types.TAGS, types.PULL_REQUESTS}, Mode: types.SYNC})
+
+	if err == nil {
+		err = self.gui.helpers.BranchesHelper.AutoForwardBranches()
+	}
 
 	return err
+}
+
+func (self *BackgroundRoutineMgr) triggerImmediateFetch() {
+	if self.triggerFetch != nil {
+		self.triggerFetch <- struct{}{}
+	}
 }

@@ -51,10 +51,8 @@ func PrevIntInCycle(sl []int, current int) int {
 
 func StringArraysOverlap(strArrA []string, strArrB []string) bool {
 	for _, first := range strArrA {
-		for _, second := range strArrB {
-			if first == second {
-				return true
-			}
+		if slices.Contains(strArrB, first) {
+			return true
 		}
 	}
 
@@ -178,19 +176,4 @@ func Shift[T any](slice []T) (T, []T) {
 	value := slice[0]
 	slice = slice[1:]
 	return value, slice
-}
-
-// Compares two slices for equality
-func EqualSlices[T comparable](slice1 []T, slice2 []T) bool {
-	if len(slice1) != len(slice2) {
-		return false
-	}
-
-	for i := range slice1 {
-		if slice1[i] != slice2[i] {
-			return false
-		}
-	}
-
-	return true
 }

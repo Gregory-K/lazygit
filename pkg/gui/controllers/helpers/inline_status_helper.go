@@ -3,7 +3,7 @@ package helpers
 import (
 	"time"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 	"github.com/jesseduffield/lazygit/pkg/utils"
@@ -15,7 +15,7 @@ type InlineStatusHelper struct {
 
 	windowHelper             *WindowHelper
 	contextsWithInlineStatus map[types.ContextKey]*inlineStatusInfo
-	mutex                    *deadlock.Mutex
+	mutex                    deadlock.Mutex
 }
 
 func NewInlineStatusHelper(c *HelperCommon, windowHelper *WindowHelper) *InlineStatusHelper {
@@ -23,7 +23,6 @@ func NewInlineStatusHelper(c *HelperCommon, windowHelper *WindowHelper) *InlineS
 		c:                        c,
 		windowHelper:             windowHelper,
 		contextsWithInlineStatus: make(map[types.ContextKey]*inlineStatusInfo),
-		mutex:                    &deadlock.Mutex{},
 	}
 }
 
@@ -150,7 +149,7 @@ func (self *InlineStatusHelper) stop(opts InlineStatusOpts) {
 }
 
 func (self *InlineStatusHelper) renderContext(contextKey types.ContextKey) {
-	self.c.OnUIThread(func() error {
+	self.c.OnUIThreadContentOnly(func() error {
 		self.c.ContextForKey(contextKey).HandleRender()
 		return nil
 	})

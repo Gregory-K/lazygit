@@ -3,25 +3,13 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
-	"github.com/samber/lo"
 )
 
 // This controller lets you change the context size for diffs. The 'context' in 'context size' refers to the conventional meaning of the word 'context' in a diff, as opposed to lazygit's own idea of a 'context'.
-
-var CONTEXT_KEYS_SHOWING_DIFFS = []types.ContextKey{
-	context.FILES_CONTEXT_KEY,
-	context.COMMIT_FILES_CONTEXT_KEY,
-	context.STASH_CONTEXT_KEY,
-	context.LOCAL_COMMITS_CONTEXT_KEY,
-	context.SUB_COMMITS_CONTEXT_KEY,
-	context.STAGING_MAIN_CONTEXT_KEY,
-	context.STAGING_SECONDARY_CONTEXT_KEY,
-	context.PATCH_BUILDING_MAIN_CONTEXT_KEY,
-	context.PATCH_BUILDING_SECONDARY_CONTEXT_KEY,
-}
 
 type ContextLinesController struct {
 	baseController
@@ -63,48 +51,41 @@ func (self *ContextLinesController) Context() types.Context {
 }
 
 func (self *ContextLinesController) Increase() error {
-	if self.isShowingDiff() {
-		if err := self.checkCanChangeContext(); err != nil {
-			return err
-		}
-
-		self.c.AppState.DiffContextSize++
-		return self.applyChange()
+	if err := self.checkCanChangeContext(); err != nil {
+		return err
 	}
 
-	return nil
+	if self.c.UserConfig().Git.DiffContextSize < math.MaxUint64 {
+		self.c.UserConfig().Git.DiffContextSize++
+	}
+	return self.applyChange()
 }
 
 func (self *ContextLinesController) Decrease() error {
-	old_size := self.c.AppState.DiffContextSize
-
-	if self.isShowingDiff() && old_size > 1 {
-		if err := self.checkCanChangeContext(); err != nil {
-			return err
-		}
-
-		self.c.AppState.DiffContextSize = old_size - 1
-		return self.applyChange()
+	if err := self.checkCanChangeContext(); err != nil {
+		return err
 	}
 
-	return nil
+	if self.c.UserConfig().Git.DiffContextSize > 0 {
+		self.c.UserConfig().Git.DiffContextSize--
+	}
+	return self.applyChange()
 }
 
 func (self *ContextLinesController) applyChange() error {
-	self.c.Toast(fmt.Sprintf(self.c.Tr.DiffContextSizeChanged, self.c.AppState.DiffContextSize))
-	self.c.SaveAppStateAndLogError()
+	self.c.Toast(fmt.Sprintf(self.c.Tr.DiffContextSizeChanged, self.c.UserConfig().Git.DiffContextSize))
 
-	currentContext := self.c.Context().CurrentStatic()
+	currentContext := self.c.Context().CurrentSide()
 	switch currentContext.GetKey() {
 	// we make an exception for our staging and patch building contexts because they actually need to refresh their state afterwards.
 	case context.PATCH_BUILDING_MAIN_CONTEXT_KEY:
-		return self.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.PATCH_BUILDING}})
+		self.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.PATCH_BUILDING}})
 	case context.STAGING_MAIN_CONTEXT_KEY, context.STAGING_SECONDARY_CONTEXT_KEY:
-		return self.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.STAGING}})
+		self.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.STAGING}})
 	default:
 		currentContext.HandleRenderToMain()
-		return nil
 	}
+	return nil
 }
 
 func (self *ContextLinesController) checkCanChangeContext() error {
@@ -113,11 +94,4 @@ func (self *ContextLinesController) checkCanChangeContext() error {
 	}
 
 	return nil
-}
-
-func (self *ContextLinesController) isShowingDiff() bool {
-	return lo.Contains(
-		CONTEXT_KEYS_SHOWING_DIFFS,
-		self.c.Context().CurrentStatic().GetKey(),
-	)
 }

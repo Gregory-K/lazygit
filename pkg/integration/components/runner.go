@@ -15,7 +15,7 @@ import (
 
 type RunTestArgs struct {
 	Tests           []*IntegrationTest
-	Logf            func(format string, formatArgs ...interface{})
+	Logf            func(format string, formatArgs ...any)
 	RunCmd          func(cmd *exec.Cmd) (int, error)
 	TestWrapper     func(test *IntegrationTest, f func() error)
 	Sandbox         bool
@@ -48,12 +48,12 @@ func RunTests(args RunTestArgs) error {
 	}
 
 	for _, test := range args.Tests {
-		args.TestWrapper(test, func() error { //nolint: thelper
+		args.TestWrapper(test, func() error {
 			paths := NewPaths(
 				filepath.Join(testDir, test.Name()),
 			)
 
-			for i := 0; i < args.MaxAttempts; i++ {
+			for i := range args.MaxAttempts {
 				err := runTest(test, args, paths, projectRootDir, gitVersion)
 				if err != nil {
 					if i == args.MaxAttempts-1 {

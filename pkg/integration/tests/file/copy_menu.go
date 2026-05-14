@@ -1,6 +1,8 @@
 package file
 
 import (
+	"os"
+
 	"github.com/jesseduffield/lazygit/pkg/config"
 	. "github.com/jesseduffield/lazygit/pkg/integration/components"
 )
@@ -17,9 +19,15 @@ var CopyMenu = NewIntegrationTest(NewIntegrationTestArgs{
 	ExtraCmdArgs: []string{},
 	Skip:         false,
 	SetupConfig: func(config *config.AppConfig) {
-		config.GetUserConfig().OS.CopyToClipboardCmd = "echo {{text}} > clipboard"
+		config.GetUserConfig().OS.CopyToClipboardCmd = "printf '%s' {{text}} > clipboard"
 	},
-	SetupRepo: func(shell *Shell) {},
+	SetupRepo: func(shell *Shell) {
+		// Run the test in a linked worktree so that we catch bugs where we
+		// use the main repo's path instead of the current worktree's path.
+		shell.EmptyCommit("initial commit")
+		shell.AddWorktree("HEAD", "../linked-worktree", "mybranch")
+		shell.Chdir("../linked-worktree")
+	},
 	Run: func(t *TestDriver, keys config.KeybindingConfig) {
 		// Disabled item
 		t.Views().Files().
@@ -100,21 +108,37 @@ var CopyMenu = NewIntegrationTest(NewIntegrationTestArgs{
 
 				t.ExpectToast(Equals("File name copied to clipboard"))
 
-				expectClipboard(t, Contains("unstaged_file"))
+				expectClipboard(t, Equals("1-unstaged_file"))
 			})
 
-		// Copy file path
+		// Copy relative file path
 		t.Views().Files().
 			Press(keys.Files.CopyFileInfoToClipboard).
 			Tap(func() {
 				t.ExpectPopup().Menu().
 					Title(Equals("Copy to clipboard")).
-					Select(Contains("Path")).
+					Select(Contains("Relative path")).
 					Confirm()
 
 				t.ExpectToast(Equals("File path copied to clipboard"))
 
-				expectClipboard(t, Contains("dir/1-unstaged_file"))
+				expectClipboard(t, Equals("dir/1-unstaged_file"))
+			})
+
+		// Copy absolute file path
+		t.Views().Files().
+			Press(keys.Files.CopyFileInfoToClipboard).
+			Tap(func() {
+				t.ExpectPopup().Menu().
+					Title(Equals("Copy to clipboard")).
+					Select(Contains("Absolute path")).
+					Confirm()
+
+				t.ExpectToast(Equals("File path copied to clipboard"))
+
+				worktreeDir, _ := os.Getwd()
+				// On windows the following path would have backslashes, but we don't run integration tests on windows yet.
+				expectClipboard(t, Equals(worktreeDir+"/dir/1-unstaged_file"))
 			})
 
 		// Selected path diff on a single (unstaged) file

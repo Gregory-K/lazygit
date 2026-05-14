@@ -3,7 +3,7 @@ package components
 import (
 	"fmt"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 )
 
 type Views struct {
@@ -126,6 +126,10 @@ func (self *Views) Menu() *ViewDriver {
 
 func (self *Views) Confirmation() *ViewDriver {
 	return self.regularView("confirmation")
+}
+
+func (self *Views) Prompt() *ViewDriver {
+	return self.regularView("prompt")
 }
 
 func (self *Views) CommitMessage() *ViewDriver {

@@ -20,43 +20,50 @@ type gitCmdObjRunner struct {
 	innerRunner oscommands.ICmdObjRunner
 }
 
-func (self *gitCmdObjRunner) Run(cmdObj oscommands.ICmdObj) error {
+// isRetryableError returns true if the error output indicates a transient
+// lock-related error that may succeed on retry
+func isRetryableError(output string) bool {
+	return strings.Contains(output, ".git/index.lock") ||
+		strings.Contains(output, "cannot lock ref")
+}
+
+func (self *gitCmdObjRunner) Run(cmdObj *oscommands.CmdObj) error {
 	_, err := self.RunWithOutput(cmdObj)
 	return err
 }
 
-func (self *gitCmdObjRunner) RunWithOutput(cmdObj oscommands.ICmdObj) (string, error) {
+func (self *gitCmdObjRunner) RunWithOutput(cmdObj *oscommands.CmdObj) (string, error) {
 	var output string
 	var err error
-	for i := 0; i < RetryCount; i++ {
+	for range RetryCount {
 		newCmdObj := cmdObj.Clone()
 		output, err = self.innerRunner.RunWithOutput(newCmdObj)
 
-		if err == nil || !strings.Contains(output, ".git/index.lock") {
+		if err == nil || !isRetryableError(output) {
 			return output, err
 		}
 
-		// if we have an error based on the index lock, we should wait a bit and then retry
-		self.log.Warn("index.lock prevented command from running. Retrying command after a small wait")
+		// if we have an error based on a lock, we should wait a bit and then retry
+		self.log.Warn("lock error prevented command from running. Retrying command after a small wait")
 		time.Sleep(WaitTime)
 	}
 
 	return output, err
 }
 
-func (self *gitCmdObjRunner) RunWithOutputs(cmdObj oscommands.ICmdObj) (string, string, error) {
+func (self *gitCmdObjRunner) RunWithOutputs(cmdObj *oscommands.CmdObj) (string, string, error) {
 	var stdout, stderr string
 	var err error
-	for i := 0; i < RetryCount; i++ {
+	for range RetryCount {
 		newCmdObj := cmdObj.Clone()
 		stdout, stderr, err = self.innerRunner.RunWithOutputs(newCmdObj)
 
-		if err == nil || !strings.Contains(stdout+stderr, ".git/index.lock") {
+		if err == nil || !isRetryableError(stdout+stderr) {
 			return stdout, stderr, err
 		}
 
-		// if we have an error based on the index lock, we should wait a bit and then retry
-		self.log.Warn("index.lock prevented command from running. Retrying command after a small wait")
+		// if we have an error based on a lock, we should wait a bit and then retry
+		self.log.Warn("lock error prevented command from running. Retrying command after a small wait")
 		time.Sleep(WaitTime)
 	}
 
@@ -64,6 +71,6 @@ func (self *gitCmdObjRunner) RunWithOutputs(cmdObj oscommands.ICmdObj) (string, 
 }
 
 // Retry logic not implemented here, but these commands typically don't need to obtain a lock.
-func (self *gitCmdObjRunner) RunAndProcessLines(cmdObj oscommands.ICmdObj, onLine func(line string) (bool, error)) error {
+func (self *gitCmdObjRunner) RunAndProcessLines(cmdObj *oscommands.CmdObj, onLine func(line string) (bool, error)) error {
 	return self.innerRunner.RunAndProcessLines(cmdObj, onLine)
 }

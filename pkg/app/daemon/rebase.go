@@ -5,38 +5,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/common"
 	"github.com/jesseduffield/lazygit/pkg/env"
 	"github.com/jesseduffield/lazygit/pkg/utils"
-	"github.com/samber/lo"
 	"github.com/stefanhaller/git-todo-parser/todo"
 )
-
-type TodoLine struct {
-	Action string
-	Commit *models.Commit
-}
-
-func (self *TodoLine) ToString() string {
-	if self.Action == "break" {
-		return self.Action + "\n"
-	} else {
-		return self.Action + " " + self.Commit.Hash + " " + self.Commit.Name + "\n"
-	}
-}
-
-func TodoLinesToString(todoLines []TodoLine) string {
-	lines := lo.Map(todoLines, func(todoLine TodoLine, _ int) string {
-		return todoLine.ToString()
-	})
-
-	return strings.Join(lo.Reverse(lines), "")
-}
 
 type ChangeTodoAction struct {
 	Hash      string
 	NewAction todo.TodoCommand
+	Flag      string
 }
 
 func handleInteractiveRebase(common *common.Common, f func(path string) error) error {

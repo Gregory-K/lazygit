@@ -43,30 +43,32 @@ var DiscardOldFileChanges = NewIntegrationTest(NewIntegrationTestArgs{
 		t.Views().CommitFiles().
 			IsFocused().
 			Lines(
-				Contains("dir1").IsSelected(),
-				Contains("subd1"),
-				Contains("subfile0"),
-				Contains("d1_file0"),
-				Contains("dir2"),
-				Contains("d2_file1"),
-				Contains("d2_file2"),
+				Equals("▼ /").IsSelected(),
+				Equals("  ▼ dir1"),
+				Equals("    A d1_file0"),
+				Equals("    ▼ subd1"),
+				Equals("      A subfile0"),
+				Equals("  ▼ dir2"),
+				Equals("    A d2_file1"),
+				Equals("    A d2_file2"),
 			).
 			NavigateToLine(Contains("d1_file0")).
 			Press(keys.Universal.Remove)
 
 		t.ExpectPopup().Confirmation().
 			Title(Equals("Discard file changes")).
-			Content(Equals("Are you sure you want to remove changes to the selected file(s) from this commit?\n\nThis action will start a rebase, reverting these file changes. Be aware that if subsequent commits depend on these changes, you may need to resolve conflicts.\nNote: This will also reset any active custom patches.")).
+			Content(Equals("Are you sure you want to discard changes to the selected file(s) from this commit?\n\nThis action will start a rebase, reverting these file changes. Be aware that if subsequent commits depend on these changes, you may need to resolve conflicts.")).
 			Confirm()
 
 		t.Views().CommitFiles().
 			IsFocused().
 			Lines(
-				Contains("dir1/subd1"),
-				Contains("subfile0"),
-				Contains("dir2"),
-				Contains("d2_file1").IsSelected(),
-				Contains("d2_file2"),
+				Equals("▼ /"),
+				Equals("  ▼ dir1/subd1"),
+				Equals("    A subfile0").IsSelected(),
+				Equals("  ▼ dir2"),
+				Equals("    A d2_file1"),
+				Equals("    A d2_file2"),
 			).
 			PressEscape()
 
@@ -84,11 +86,11 @@ var DiscardOldFileChanges = NewIntegrationTest(NewIntegrationTestArgs{
 		t.Views().CommitFiles().
 			IsFocused().
 			Lines(
-				Contains("dir2").IsSelected(),
-				Contains("d2_file1"),
-				Contains("d2_file2"),
-				Contains("d2_file3"),
-				Contains("d2_file4"),
+				Equals("▼ dir2").IsSelected(),
+				Equals("  M d2_file1"),
+				Equals("  D d2_file2"),
+				Equals("  A d2_file3"),
+				Equals("  A d2_file4"),
 			).
 			NavigateToLine(Contains("d2_file1")).
 			Press(keys.Universal.ToggleRangeSelect).
@@ -97,7 +99,7 @@ var DiscardOldFileChanges = NewIntegrationTest(NewIntegrationTestArgs{
 
 		t.ExpectPopup().Confirmation().
 			Title(Equals("Discard file changes")).
-			Content(Equals("Are you sure you want to remove changes to the selected file(s) from this commit?\n\nThis action will start a rebase, reverting these file changes. Be aware that if subsequent commits depend on these changes, you may need to resolve conflicts.\nNote: This will also reset any active custom patches.")).
+			Content(Equals("Are you sure you want to discard changes to the selected file(s) from this commit?\n\nThis action will start a rebase, reverting these file changes. Be aware that if subsequent commits depend on these changes, you may need to resolve conflicts.")).
 			Confirm()
 
 		t.Views().CommitFiles().
@@ -122,11 +124,11 @@ var DiscardOldFileChanges = NewIntegrationTest(NewIntegrationTestArgs{
 		t.Views().CommitFiles().
 			IsFocused().
 			Lines(
-				Contains("dir1").IsSelected(),
-				Contains("subd1"),
-				Contains("file2ToRemove"),
-				Contains("fileToRemove"),
-				Contains("multiLineFile"),
+				Equals("▼ dir1").IsSelected(),
+				Equals("  A fileToRemove"),
+				Equals("  A multiLineFile"),
+				Equals("  ▼ subd1"),
+				Equals("    A file2ToRemove"),
 			).
 			NavigateToLine(Contains("multiLineFile")).
 			PressEnter()
@@ -142,11 +144,11 @@ var DiscardOldFileChanges = NewIntegrationTest(NewIntegrationTestArgs{
 		t.Views().CommitFiles().
 			IsFocused().
 			Lines(
-				Contains("dir1"),
-				Contains("subd1"),
-				Contains("file2ToRemove"),
-				Contains("fileToRemove"),
-				Contains("multiLineFile").IsSelected(),
+				Equals("▼ dir1"),
+				Equals("  A fileToRemove"),
+				Equals("  ◐ multiLineFile").IsSelected(),
+				Equals("  ▼ subd1"),
+				Equals("    A file2ToRemove"),
 			).
 			NavigateToLine(Contains("dir1")).
 			Press(keys.Universal.ToggleRangeSelect).
@@ -155,7 +157,7 @@ var DiscardOldFileChanges = NewIntegrationTest(NewIntegrationTestArgs{
 
 		t.ExpectPopup().Confirmation().
 			Title(Equals("Discard file changes")).
-			Content(Equals("Are you sure you want to remove changes to the selected file(s) from this commit?\n\nThis action will start a rebase, reverting these file changes. Be aware that if subsequent commits depend on these changes, you may need to resolve conflicts.\nNote: This will also reset any active custom patches.")).
+			Content(Equals("Are you sure you want to discard changes to the selected file(s) from this commit?\n\nThis action will start a rebase, reverting these file changes. Be aware that if subsequent commits depend on these changes, you may need to resolve conflicts.\n\nNote: This will reset the active custom patch!")).
 			Confirm()
 
 		// "Building patch" will still be in this view if the patch isn't reset properly

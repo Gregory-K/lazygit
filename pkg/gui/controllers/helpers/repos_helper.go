@@ -8,11 +8,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jesseduffield/gocui"
 	appTypes "github.com/jesseduffield/lazygit/pkg/app/types"
 	"github.com/jesseduffield/lazygit/pkg/commands"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/env"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation/icons"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
@@ -59,9 +59,9 @@ func (self *ReposHelper) getCurrentBranch(path string) string {
 			content := strings.TrimSpace(string(headFile))
 			refsPrefix := "ref: refs/heads/"
 			var branchDisplay string
-			if strings.HasPrefix(content, refsPrefix) {
+			if bareName, ok := strings.CutPrefix(content, refsPrefix); ok {
 				// is a branch
-				branchDisplay = strings.TrimPrefix(content, refsPrefix)
+				branchDisplay = bareName
 			} else {
 				// detached HEAD state, displaying short hash
 				branchDisplay = utils.ShortHash(content)

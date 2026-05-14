@@ -18,8 +18,16 @@ type PatchLine struct {
 	Content string // something like '+ hello' (note the first character is not removed)
 }
 
-func (self *PatchLine) isChange() bool {
+func (self *PatchLine) IsChange() bool {
 	return self.Kind == ADDITION || self.Kind == DELETION
+}
+
+func (self *PatchLine) IsAddition() bool {
+	return self.Kind == ADDITION
+}
+
+func (self *PatchLine) IsDeletion() bool {
+	return self.Kind == DELETION
 }
 
 // Returns the number of lines in the given slice that have one of the given kinds

@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
+	"github.com/samber/lo"
 )
 
 type RemoteCommands struct {
@@ -49,9 +50,10 @@ func (self *RemoteCommands) UpdateRemoteUrl(remoteName string, updatedUrl string
 	return self.cmd.New(cmdArgs).Run()
 }
 
-func (self *RemoteCommands) DeleteRemoteBranch(task gocui.Task, remoteName string, branchName string) error {
+func (self *RemoteCommands) DeleteRemoteBranch(task gocui.Task, remoteName string, branchNames []string) error {
 	cmdArgs := NewGitCmd("push").
-		Arg(remoteName, "--delete", branchName).
+		Arg(remoteName, "--delete").
+		Arg(lo.Map(branchNames, func(b string, _ int) string { return "refs/heads/" + b })...).
 		ToArgv()
 
 	return self.cmd.New(cmdArgs).PromptOnCredentialRequest(task).Run()
@@ -59,7 +61,7 @@ func (self *RemoteCommands) DeleteRemoteBranch(task gocui.Task, remoteName strin
 
 func (self *RemoteCommands) DeleteRemoteTag(task gocui.Task, remoteName string, tagName string) error {
 	cmdArgs := NewGitCmd("push").
-		Arg(remoteName, "--delete", tagName).
+		Arg(remoteName, "--delete", "refs/tags/"+tagName).
 		ToArgv()
 
 	return self.cmd.New(cmdArgs).PromptOnCredentialRequest(task).Run()
@@ -83,6 +85,6 @@ func (self *RemoteCommands) GetRemoteURL(remoteName string) (string, error) {
 		Arg("--get-url", remoteName).
 		ToArgv()
 
-	url, err := self.cmd.New(cmdArgs).RunWithOutput()
+	url, err := self.cmd.New(cmdArgs).DontLog().RunWithOutput()
 	return strings.TrimSpace(url), err
 }

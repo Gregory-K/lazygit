@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jesseduffield/generics/set"
+	"github.com/jesseduffield/lazygit/pkg/config"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/controllers/helpers"
-	"github.com/jesseduffield/lazygit/pkg/gui/keybindings"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 	"github.com/jesseduffield/lazygit/pkg/theme"
@@ -38,7 +40,14 @@ func (self *OptionsMapMgr) renderContextOptionsMap() {
 	currentContextBindings := currentContext.GetKeybindings(self.c.KeybindingsOpts())
 	globalBindings := self.c.Contexts().Global.GetKeybindings(self.c.KeybindingsOpts())
 
-	allBindings := append(currentContextBindings, globalBindings...)
+	currentContextKeys := set.NewFromSlice(
+		lo.Map(currentContextBindings, func(binding *types.Binding, _ int) gocui.Key {
+			return binding.Key
+		}))
+
+	allBindings := append(currentContextBindings, lo.Filter(globalBindings, func(b *types.Binding, _ int) bool {
+		return !currentContextKeys.Includes(b.Key)
+	})...)
 
 	bindingsToDisplay := lo.Filter(allBindings, func(binding *types.Binding, _ int) bool {
 		return binding.DisplayOnScreen && !binding.IsDisabled()
@@ -50,14 +59,9 @@ func (self *OptionsMapMgr) renderContextOptionsMap() {
 			displayStyle = *binding.DisplayStyle
 		}
 
-		description := binding.Description
-		if binding.ShortDescription != "" {
-			description = binding.ShortDescription
-		}
-
 		return bindingInfo{
-			key:         keybindings.LabelFromKey(binding.Key),
-			description: description,
+			key:         config.LabelForKey(binding.Key),
+			description: binding.GetShortDescription(),
 			style:       displayStyle,
 		}
 	})
@@ -66,7 +70,7 @@ func (self *OptionsMapMgr) renderContextOptionsMap() {
 	if currentContext.GetKey() == context.LOCAL_COMMITS_CONTEXT_KEY {
 		if self.c.Modes().CherryPicking.Active() {
 			optionsMap = utils.Prepend(optionsMap, bindingInfo{
-				key:         keybindings.Label(self.c.KeybindingsOpts().Config.Commits.PasteCommits),
+				key:         self.c.KeybindingsOpts().Config.Commits.PasteCommits,
 				description: self.c.Tr.PasteCommits,
 				style:       style.FgCyan,
 			})
@@ -74,7 +78,7 @@ func (self *OptionsMapMgr) renderContextOptionsMap() {
 
 		if self.c.Model().BisectInfo.Started() {
 			optionsMap = utils.Prepend(optionsMap, bindingInfo{
-				key:         keybindings.Label(self.c.KeybindingsOpts().Config.Commits.ViewBisectOptions),
+				key:         self.c.KeybindingsOpts().Config.Commits.ViewBisectOptions,
 				description: self.c.Tr.ViewBisectOptions,
 				style:       style.FgGreen,
 			})
@@ -82,23 +86,17 @@ func (self *OptionsMapMgr) renderContextOptionsMap() {
 	}
 
 	// Mode-specific global keybindings
-	if self.c.Model().WorkingTreeStateAtLastCommitRefresh.IsRebasing() {
+	if state := self.c.Model().WorkingTreeStateAtLastCommitRefresh; state.Any() {
 		optionsMap = utils.Prepend(optionsMap, bindingInfo{
-			key:         keybindings.Label(self.c.KeybindingsOpts().Config.Universal.CreateRebaseOptionsMenu),
-			description: self.c.Tr.ViewRebaseOptions,
-			style:       style.FgYellow,
-		})
-	} else if self.c.Model().WorkingTreeStateAtLastCommitRefresh.IsMerging() {
-		optionsMap = utils.Prepend(optionsMap, bindingInfo{
-			key:         keybindings.Label(self.c.KeybindingsOpts().Config.Universal.CreateRebaseOptionsMenu),
-			description: self.c.Tr.ViewMergeOptions,
+			key:         self.c.KeybindingsOpts().Config.Universal.CreateRebaseOptionsMenu,
+			description: state.OptionsMapTitle(self.c.Tr),
 			style:       style.FgYellow,
 		})
 	}
 
 	if self.c.Git().Patch.PatchBuilder.Active() {
 		optionsMap = utils.Prepend(optionsMap, bindingInfo{
-			key:         keybindings.Label(self.c.KeybindingsOpts().Config.Universal.CreatePatchOptionsMenu),
+			key:         self.c.KeybindingsOpts().Config.Universal.CreatePatchOptionsMenu,
 			description: self.c.Tr.ViewPatchOptions,
 			style:       style.FgYellow,
 		})
@@ -108,7 +106,7 @@ func (self *OptionsMapMgr) renderContextOptionsMap() {
 }
 
 func (self *OptionsMapMgr) formatBindingInfos(bindingInfos []bindingInfo) string {
-	width := self.c.Views().Options.Width() - 4 // -4 for the padding
+	width := self.c.Views().Options.InnerWidth() - 2 // -2 for some padding
 	var builder strings.Builder
 	ellipsis := "…"
 	separator := " | "
@@ -119,7 +117,8 @@ func (self *OptionsMapMgr) formatBindingInfos(bindingInfos []bindingInfo) string
 		plainText := fmt.Sprintf("%s: %s", info.description, info.key)
 
 		// Check if adding the next formatted string exceeds the available width
-		if i > 0 && length+len(separator)+len(plainText) > width {
+		textLen := utils.StringWidth(plainText)
+		if i > 0 && length+len(separator)+textLen > width {
 			builder.WriteString(theme.OptionsFgColor.Sprint(separator + ellipsis))
 			break
 		}
@@ -131,7 +130,7 @@ func (self *OptionsMapMgr) formatBindingInfos(bindingInfos []bindingInfo) string
 			length += len(separator)
 		}
 		builder.WriteString(formatted)
-		length += len(plainText)
+		length += textLen
 	}
 
 	return builder.String()

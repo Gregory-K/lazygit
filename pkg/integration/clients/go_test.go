@@ -1,10 +1,9 @@
 //go:build !windows
-// +build !windows
 
 package clients
 
 // This file allows you to use `go test` to run integration tests.
-// See See pkg/integration/README.md for more info.
+// See pkg/integration/README.md for more info.
 
 import (
 	"bytes"
@@ -66,7 +65,7 @@ func TestIntegration(t *testing.T) {
 func runCmdHeadless(cmd *exec.Cmd) (int, error) {
 	cmd.Env = append(
 		cmd.Env,
-		"HEADLESS=true",
+		"LAZYGIT_HEADLESS=true",
 		"TERM=xterm",
 	)
 

@@ -1,17 +1,12 @@
 package helpers
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/jesseduffield/lazygit/pkg/commands/patch"
-	"github.com/jesseduffield/lazygit/pkg/commands/types/enums"
 	"github.com/jesseduffield/lazygit/pkg/gui/patch_exploring"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 )
-
-type IPatchBuildingHelper interface {
-	ValidateNormalWorkingTreeState() (bool, error)
-}
 
 type PatchBuildingHelper struct {
 	c *HelperCommon
@@ -25,11 +20,16 @@ func NewPatchBuildingHelper(
 	}
 }
 
-func (self *PatchBuildingHelper) ValidateNormalWorkingTreeState() (bool, error) {
-	if self.c.Git().Status.WorkingTreeState() != enums.REBASE_MODE_NONE {
-		return false, errors.New(self.c.Tr.CantPatchWhileRebasingError)
+func (self *PatchBuildingHelper) ShowHunkStagingHint() {
+	if !self.c.AppState.DidShowHunkStagingHint && self.c.UserConfig().Gui.UseHunkModeInStagingView {
+		self.c.AppState.DidShowHunkStagingHint = true
+		self.c.SaveAppStateAndLogError()
+
+		message := fmt.Sprintf(self.c.Tr.HunkStagingHint, self.c.UserConfig().Keybinding.Main.ToggleSelectHunk)
+		self.c.Confirm(types.ConfirmOpts{
+			Prompt: message,
+		})
 	}
-	return true, nil
 }
 
 // takes us from the patch building panel back to the commit files panel
@@ -45,14 +45,13 @@ func (self *PatchBuildingHelper) Reset() error {
 		self.Escape()
 	}
 
-	if err := self.c.Refresh(types.RefreshOptions{
+	self.c.Refresh(types.RefreshOptions{
 		Scope: []types.RefreshableView{types.COMMIT_FILES},
-	}); err != nil {
-		return err
-	}
+	})
 
 	// refreshing the current context so that the secondary panel is hidden if necessary.
-	return self.c.PostRefreshUpdate(self.c.Context().Current())
+	self.c.PostRefreshUpdate(self.c.Context().Current())
+	return nil
 }
 
 func (self *PatchBuildingHelper) RefreshPatchBuildingPanel(opts types.OnFocusOpts) {
@@ -90,14 +89,14 @@ func (self *PatchBuildingHelper) RefreshPatchBuildingPanel(opts types.OnFocusOpt
 
 	oldState := context.GetState()
 
-	state := patch_exploring.NewState(diff, selectedLineIdx, oldState, self.c.Log)
+	state := patch_exploring.NewState(diff, selectedLineIdx, context.GetView(), oldState, self.c.UserConfig().Gui.UseHunkModeInStagingView)
 	context.SetState(state)
 	if state == nil {
 		self.Escape()
 		return
 	}
 
-	mainContent := context.GetContentToRender(true)
+	mainContent := context.GetContentToRender()
 
 	self.c.Contexts().CustomPatchBuilder.FocusSelection()
 

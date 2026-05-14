@@ -2,9 +2,9 @@ package filetree
 
 import (
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
+	"github.com/jesseduffield/lazygit/pkg/common"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 	"github.com/samber/lo"
-	"github.com/sirupsen/logrus"
 )
 
 type ICommitFileTree interface {
@@ -15,22 +15,40 @@ type ICommitFileTree interface {
 	GetAllItems() []*CommitFileNode
 	GetAllFiles() []*models.CommitFile
 	GetRoot() *CommitFileNode
+	SetTextFilter(filter string, useFuzzySearch bool)
+	GetTextFilter() string
 }
 
 type CommitFileTree struct {
 	getFiles       func() []*models.CommitFile
 	tree           *Node[models.CommitFile]
 	showTree       bool
-	log            *logrus.Entry
+	common         *common.Common
 	collapsedPaths *CollapsedPaths
+	textFilter     string
+	useFuzzySearch bool
+}
+
+func (self *CommitFileTree) CollapseAll() {
+	dirPaths := lo.FilterMap(self.GetAllItems(), func(file *CommitFileNode, index int) (string, bool) {
+		return file.path, !file.IsFile()
+	})
+
+	for _, path := range dirPaths {
+		self.collapsedPaths.Collapse(path)
+	}
+}
+
+func (self *CommitFileTree) ExpandAll() {
+	self.collapsedPaths.ExpandAll()
 }
 
 var _ ICommitFileTree = &CommitFileTree{}
 
-func NewCommitFileTree(getFiles func() []*models.CommitFile, log *logrus.Entry, showTree bool) *CommitFileTree {
+func NewCommitFileTree(getFiles func() []*models.CommitFile, common *common.Common, showTree bool) *CommitFileTree {
 	return &CommitFileTree{
 		getFiles:       getFiles,
-		log:            log,
+		common:         common,
 		showTree:       showTree,
 		collapsedPaths: NewCollapsedPaths(),
 	}
@@ -79,12 +97,34 @@ func (self *CommitFileTree) GetAllFiles() []*models.CommitFile {
 	return self.getFiles()
 }
 
-func (self *CommitFileTree) SetTree() {
-	if self.showTree {
-		self.tree = BuildTreeFromCommitFiles(self.getFiles())
-	} else {
-		self.tree = BuildFlatTreeFromCommitFiles(self.getFiles())
+func (self *CommitFileTree) getFilesForDisplay() []*models.CommitFile {
+	files := self.getFiles()
+	if self.textFilter != "" {
+		files = filterCommitFilesByText(files, self.textFilter, self.useFuzzySearch)
 	}
+	return files
+}
+
+func (self *CommitFileTree) SetTree() {
+	filesForDisplay := self.getFilesForDisplay()
+	guiConfig := self.common.UserConfig().Gui
+	showRootItem := guiConfig.ShowRootItemInFileTree
+	cmp := NodeSortComparator[models.CommitFile](guiConfig.FileTreeSortOrder, guiConfig.FileTreeSortCaseSensitive)
+	if self.showTree {
+		self.tree = BuildTreeFromCommitFiles(filesForDisplay, showRootItem, cmp)
+	} else {
+		self.tree = BuildFlatTreeFromCommitFiles(filesForDisplay, showRootItem, cmp)
+	}
+}
+
+func (self *CommitFileTree) SetTextFilter(filter string, useFuzzySearch bool) {
+	self.textFilter = filter
+	self.useFuzzySearch = useFuzzySearch
+	self.SetTree()
+}
+
+func (self *CommitFileTree) GetTextFilter() string {
+	return self.textFilter
 }
 
 func (self *CommitFileTree) IsCollapsed(path string) bool {
@@ -105,12 +145,16 @@ func (self *CommitFileTree) CollapsedPaths() *CollapsedPaths {
 
 func (self *CommitFileTree) GetFile(path string) *models.CommitFile {
 	for _, file := range self.getFiles() {
-		if file.Name == path {
+		if file.Path == path {
 			return file
 		}
 	}
 
 	return nil
+}
+
+func (self *CommitFileTree) GetVisualDepth(index int) int {
+	return self.tree.GetVisualDepthAtIndex(index+1, self.collapsedPaths) // +1 to skip root
 }
 
 func (self *CommitFileTree) InTreeMode() bool {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mattn/go-runewidth"
+	"github.com/rivo/uniseg"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -253,25 +253,25 @@ func TestRenderDisplayStrings(t *testing.T) {
 }
 
 func BenchmarkStringWidthAsciiOriginal(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		runewidth.StringWidth("some ASCII string")
+	for b.Loop() {
+		uniseg.StringWidth("some ASCII string")
 	}
 }
 
 func BenchmarkStringWidthAsciiOptimized(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		StringWidth("some ASCII string")
 	}
 }
 
 func BenchmarkStringWidthNonAsciiOriginal(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		runewidth.StringWidth("some non-ASCII string 🍉")
+	for b.Loop() {
+		uniseg.StringWidth("some non-ASCII string 🍉")
 	}
 }
 
 func BenchmarkStringWidthNonAsciiOptimized(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		StringWidth("some non-ASCII string 🍉")
 	}
 }

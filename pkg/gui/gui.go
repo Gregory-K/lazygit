@@ -2,6 +2,7 @@ package gui
 
 import (
 	goContext "context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,8 +12,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazycore/pkg/boxlayout"
 	appTypes "github.com/jesseduffield/lazygit/pkg/app/types"
 	"github.com/jesseduffield/lazygit/pkg/commands"
@@ -22,9 +23,9 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/commands/oscommands"
 	"github.com/jesseduffield/lazygit/pkg/common"
 	"github.com/jesseduffield/lazygit/pkg/config"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/controllers/helpers"
-	"github.com/jesseduffield/lazygit/pkg/gui/keybindings"
 	"github.com/jesseduffield/lazygit/pkg/gui/modes/cherrypicking"
 	"github.com/jesseduffield/lazygit/pkg/gui/modes/diffing"
 	"github.com/jesseduffield/lazygit/pkg/gui/modes/filtering"
@@ -68,6 +69,8 @@ type Gui struct {
 	// this is the state of the GUI for the current repo
 	State *GuiRepoState
 
+	pagerConfig *config.PagerConfig
+
 	CustomCommandsClient *custom_commands.Client
 
 	// this is a mapping of repos to gui states, so that we can restore the original
@@ -108,8 +111,6 @@ type Gui struct {
 
 	PopupHandler types.IPopupHandler
 
-	IsNewRepo bool
-
 	IsRefreshingFiles bool
 
 	// we use this to decide whether we'll return to the original directory that
@@ -120,7 +121,7 @@ type Gui struct {
 	// is being pushed). At the moment the rule is to use an item operation when
 	// we need to talk to the remote.
 	itemOperations      map[string]types.ItemOperation
-	itemOperationsMutex *deadlock.Mutex
+	itemOperationsMutex deadlock.Mutex
 
 	PrevLayout PrevLayout
 
@@ -168,6 +169,10 @@ func (self *StateAccessor) SetUpdating(value bool) {
 
 func (self *StateAccessor) GetRepoState() types.IRepoStateAccessor {
 	return self.gui.State
+}
+
+func (self *StateAccessor) GetPagerConfig() *config.PagerConfig {
+	return self.gui.pagerConfig
 }
 
 func (self *StateAccessor) GetIsRefreshingFiles() bool {
@@ -228,7 +233,6 @@ type GuiRepoState struct {
 	Modes *types.Modes
 
 	SplitMainPanel bool
-	LimitCommits   bool
 
 	SearchState  *types.SearchState
 	StartupStage types.StartupStage // Allows us to not load everything at once
@@ -246,9 +250,11 @@ type GuiRepoState struct {
 	// back in sync with the repo state
 	ViewsSetup bool
 
-	ScreenMode types.WindowMaximisation
+	ScreenMode types.ScreenMode
 
 	CurrentPopupOpts *types.CreatePopupPanelOpts
+
+	LastBackgroundFetchTime time.Time
 }
 
 var _ types.IRepoStateAccessor = new(GuiRepoState)
@@ -277,11 +283,11 @@ func (self *GuiRepoState) SetCurrentPopupOpts(value *types.CreatePopupPanelOpts)
 	self.CurrentPopupOpts = value
 }
 
-func (self *GuiRepoState) GetScreenMode() types.WindowMaximisation {
+func (self *GuiRepoState) GetScreenMode() types.ScreenMode {
 	return self.ScreenMode
 }
 
-func (self *GuiRepoState) SetScreenMode(value types.WindowMaximisation) {
+func (self *GuiRepoState) SetScreenMode(value types.ScreenMode) {
 	self.ScreenMode = value
 }
 
@@ -301,6 +307,16 @@ func (self *GuiRepoState) GetSplitMainPanel() bool {
 	return self.SplitMainPanel
 }
 
+func (gui *Gui) onSwitchToNewRepo(startArgs appTypes.StartArgs, contextKey types.ContextKey) error {
+	err := gui.onNewRepo(startArgs, contextKey)
+	if err == nil && gui.UserConfig().Git.AutoFetch && gui.UserConfig().Refresher.FetchInterval > 0 {
+		if time.Since(gui.State.LastBackgroundFetchTime) > gui.UserConfig().Refresher.FetchIntervalDuration() {
+			gui.BackgroundRoutineMgr.triggerImmediateFetch()
+		}
+	}
+	return err
+}
+
 func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.ContextKey) error {
 	var err error
 	gui.git, err = commands.NewGitCommand(
@@ -308,6 +324,7 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 		gui.gitVersion,
 		gui.os,
 		git_config.NewStdCachedGitConfig(gui.Log),
+		gui.pagerConfig,
 	)
 	if err != nil {
 		return err
@@ -333,6 +350,8 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 
 	gui.g.SetFocusHandler(func(Focused bool) error {
 		if Focused {
+			gui.git.Config.DropConfigCache()
+
 			oldConfig := gui.Config.GetUserConfig()
 			reloadErr, didChange := gui.Config.ReloadChangedUserConfigFiles()
 			if didChange && reloadErr == nil {
@@ -348,21 +367,16 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 			}
 
 			gui.c.Log.Info("Receiving focus - refreshing")
-			refreshErr := gui.helpers.Refresh.Refresh(types.RefreshOptions{Mode: types.ASYNC})
-			if reloadErr != nil {
-				// An error from reloading the config is the more important one
-				// to report to the user
-				return reloadErr
-			}
-			return refreshErr
+			gui.helpers.Refresh.Refresh(types.RefreshOptions{Mode: types.ASYNC})
+			return reloadErr
 		}
 
 		return nil
 	})
 
-	gui.g.SetOpenHyperlinkFunc(func(url string) error {
+	gui.g.SetOpenHyperlinkFunc(func(url string, viewname string) error {
 		if strings.HasPrefix(url, "lazygit-edit:") {
-			re := regexp.MustCompile(`^lazygit-edit://(.+?)(?::(\d+))?$`)
+			re := regexp.MustCompile(`^lazygit-edit://(.+?)(?::(\d*))?$`)
 			matches := re.FindStringSubmatch(url)
 			if matches == nil {
 				return fmt.Errorf(gui.Tr.InvalidLazygitEditURL, url)
@@ -370,6 +384,7 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 			filepath := matches[1]
 			if matches[2] != "" {
 				lineNumber := utils.MustConvertToInt(matches[2])
+				lineNumber = gui.helpers.Diff.AdjustLineNumber(filepath, lineNumber, viewname)
 				return gui.helpers.Files.EditFileAtLine(filepath, lineNumber)
 			}
 			return gui.helpers.Files.EditFiles([]string{filepath})
@@ -380,6 +395,24 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 		}
 
 		return nil
+	})
+
+	gui.g.SetOnSelectSearchResultFunc(func(v *gocui.View, selectedLineIdx int) {
+		ctx, ok := gui.helpers.View.ContextForView(v.Name())
+		if ok {
+			if searchableContext, ok := ctx.(types.ISearchableContext); ok {
+				searchableContext.OnSearchSelect(selectedLineIdx)
+			}
+		}
+	})
+
+	gui.g.SetRenderSearchStatusFunc(func(v *gocui.View, index int, total int) {
+		ctx, ok := gui.helpers.View.ContextForView(v.Name())
+		if ok {
+			if searchableContext, ok := ctx.(types.ISearchableContext); ok {
+				searchableContext.RenderSearchStatus(index, total)
+			}
+		}
 	})
 
 	// if a context key has been given, push that instead, and set its index to 0
@@ -393,7 +426,9 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 		}
 	}
 
-	gui.c.Context().Push(contextToPush)
+	gui.c.Context().Push(contextToPush, types.OnFocusOpts{})
+
+	gui.render()
 
 	return nil
 }
@@ -425,17 +460,6 @@ func (gui *Gui) onUserConfigLoaded() error {
 	userConfig := gui.Config.GetUserConfig()
 	gui.Common.SetUserConfig(userConfig)
 
-	gui.setColorScheme()
-	gui.configureViewProperties()
-
-	gui.g.SearchEscapeKey = keybindings.GetKey(userConfig.Keybinding.Universal.Return)
-	gui.g.NextSearchMatchKey = keybindings.GetKey(userConfig.Keybinding.Universal.NextMatch)
-	gui.g.PrevSearchMatchKey = keybindings.GetKey(userConfig.Keybinding.Universal.PrevMatch)
-
-	gui.g.ShowListFooter = userConfig.Gui.ShowListFooter
-
-	gui.g.Mouse = userConfig.Gui.MouseEvents
-
 	if gui.previousLanguageConfig != userConfig.Gui.Language {
 		tr, err := i18n.NewTranslationSetFromConfig(gui.Log, userConfig.Gui.Language)
 		if err != nil {
@@ -444,6 +468,24 @@ func (gui *Gui) onUserConfigLoaded() error {
 		gui.c.Tr = tr
 		gui.previousLanguageConfig = userConfig.Gui.Language
 	}
+
+	gui.setColorScheme()
+	gui.configureViewProperties()
+
+	gui.g.SearchEscapeKey = config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.Return)
+	gui.g.NextSearchMatchKey = config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.NextMatch)
+	gui.g.PrevSearchMatchKey = config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.PrevMatch)
+
+	gui.g.SetEditKeybindings(
+		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.MoveWordLeft),
+		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.MoveWordRight),
+		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.BackspaceWord),
+		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.ForwardDeleteWord),
+	)
+
+	gui.g.ShowListFooter = userConfig.Gui.ShowListFooter
+
+	gui.g.Mouse = userConfig.Gui.MouseEvents
 
 	// originally we could only hide the command log permanently via the config
 	// but now we do it via state. So we need to still support the config for the
@@ -455,8 +497,16 @@ func (gui *Gui) onUserConfigLoaded() error {
 		icons.SetNerdFontsVersion(userConfig.Gui.NerdFontsVersion)
 	} else if userConfig.Gui.ShowIcons {
 		icons.SetNerdFontsVersion("2")
+	} else {
+		icons.SetNerdFontsVersion("")
 	}
-	presentation.SetCustomBranches(userConfig.Gui.BranchColors)
+
+	if len(userConfig.Gui.BranchColorPatterns) > 0 {
+		presentation.SetCustomBranches(userConfig.Gui.BranchColorPatterns, true)
+	} else {
+		// Fall back to the deprecated branchColors config
+		presentation.SetCustomBranches(userConfig.Gui.BranchColors, false)
+	}
 
 	return nil
 }
@@ -516,6 +566,13 @@ func (gui *Gui) checkForChangedConfigsThatDontAutoReload(oldConfig *config.UserC
 // resetState reuses the repo state from our repo state map, if the repo was
 // open before; otherwise it creates a new one.
 func (gui *Gui) resetState(startArgs appTypes.StartArgs) types.Context {
+	// Un-highlight the current view if there is one. The reason we do this is
+	// that the repo we are switching to might have a different view focused,
+	// and would then show an inactive highlight for the previous view.
+	if oldCurrentView := gui.g.CurrentView(); oldCurrentView != nil {
+		oldCurrentView.Highlight = false
+	}
+
 	worktreePath := gui.git.RepoPaths.WorktreePath()
 
 	if state := gui.RepoStateMap[Repo(worktreePath)]; state != nil {
@@ -551,6 +608,9 @@ func (gui *Gui) resetState(startArgs appTypes.StartArgs) types.Context {
 			FilesTrie:             patricia.NewTrie(),
 			Authors:               map[string]*models.Author{},
 			MainBranches:          git_commands.NewMainBranches(gui.c.Common, gui.os.Cmd),
+			HashPool:              &utils.StringPool{},
+			PullRequests:          gui.loadCachedPullRequests(),
+			PullRequestsMap:       make(map[string]*models.GithubPullRequest),
 		},
 		Modes: &types.Modes{
 			Filtering:        filtering.New(startArgs.FilterPath, ""),
@@ -571,6 +631,33 @@ func (gui *Gui) resetState(startArgs appTypes.StartArgs) types.Context {
 	return initialContext(contextTree, startArgs)
 }
 
+func (gui *Gui) loadCachedPullRequests() []*models.GithubPullRequest {
+	repoPath := gui.git.RepoPaths.RepoPath()
+	cachedPRs := gui.c.GetAppState().GithubPullRequests[repoPath]
+
+	return lo.Map(cachedPRs, func(cached config.CachedPullRequest, _ int) *models.GithubPullRequest {
+		return &models.GithubPullRequest{
+			HeadRefName: cached.HeadRefName,
+			Number:      cached.Number,
+			Title:       cached.Title,
+			State:       cached.State,
+			Url:         cached.Url,
+			HeadRepositoryOwner: models.GithubRepositoryOwner{
+				Login: cached.HeadRepositoryOwner,
+			},
+		}
+	})
+}
+
+func (gui *Gui) getViewBufferManagerForView(view *gocui.View) *tasks.ViewBufferManager {
+	manager, ok := gui.viewBufferManagerMap[view.Name()]
+	if !ok {
+		return nil
+	}
+
+	return manager
+}
+
 func initialWindowViewNameMap(contextTree *context.ContextTree) *utils.ThreadSafeMap[string, string] {
 	result := utils.NewThreadSafeMap[string, string]()
 
@@ -581,20 +668,24 @@ func initialWindowViewNameMap(contextTree *context.ContextTree) *utils.ThreadSaf
 	return result
 }
 
-func initialScreenMode(startArgs appTypes.StartArgs, config config.AppConfigurer) types.WindowMaximisation {
-	if startArgs.FilterPath != "" || startArgs.GitArg != appTypes.GitArgNone {
-		return types.SCREEN_FULL
-	} else {
-		defaultWindowSize := config.GetUserConfig().Gui.WindowSize
+func initialScreenMode(startArgs appTypes.StartArgs, config config.AppConfigurer) types.ScreenMode {
+	if startArgs.ScreenMode != "" {
+		return parseScreenModeArg(startArgs.ScreenMode)
+	} else if startArgs.FilterPath != "" || startArgs.GitArg != appTypes.GitArgNone {
+		return types.SCREEN_HALF
+	}
 
-		switch defaultWindowSize {
-		case "half":
-			return types.SCREEN_HALF
-		case "full":
-			return types.SCREEN_FULL
-		default:
-			return types.SCREEN_NORMAL
-		}
+	return parseScreenModeArg(config.GetUserConfig().Gui.ScreenMode)
+}
+
+func parseScreenModeArg(screenModeArg string) types.ScreenMode {
+	switch screenModeArg {
+	case "half":
+		return types.SCREEN_HALF
+	case "full":
+		return types.SCREEN_FULL
+	default:
+		return types.SCREEN_NORMAL
 	}
 }
 
@@ -629,7 +720,7 @@ func (gui *Gui) Contexts() *context.ContextTree {
 // NewGui builds a new gui handler
 func NewGui(
 	cmn *common.Common,
-	config config.AppConfigurer,
+	configurer config.AppConfigurer,
 	gitVersion *git_commands.GitVersion,
 	updater *updates.Updater,
 	showRecentRepos bool,
@@ -639,7 +730,7 @@ func NewGui(
 	gui := &Gui{
 		Common:               cmn,
 		gitVersion:           gitVersion,
-		Config:               config,
+		Config:               configurer,
 		Updater:              updater,
 		statusManager:        status.NewStatusManager(),
 		viewBufferManagerMap: map[string]*tasks.ViewBufferManager{},
@@ -653,22 +744,10 @@ func NewGui(
 		// real value after loading the user config:
 		ShowExtrasWindow: true,
 
-		Mutexes: types.Mutexes{
-			RefreshingFilesMutex:    &deadlock.Mutex{},
-			RefreshingBranchesMutex: &deadlock.Mutex{},
-			RefreshingStatusMutex:   &deadlock.Mutex{},
-			LocalCommitsMutex:       &deadlock.Mutex{},
-			SubCommitsMutex:         &deadlock.Mutex{},
-			AuthorsMutex:            &deadlock.Mutex{},
-			SubprocessMutex:         &deadlock.Mutex{},
-			PopupMutex:              &deadlock.Mutex{},
-			PtyMutex:                &deadlock.Mutex{},
-		},
 		InitialDir:       initialDir,
 		afterLayoutFuncs: make(chan func() error, 1000),
 
-		itemOperations:      make(map[string]types.ItemOperation),
-		itemOperationsMutex: &deadlock.Mutex{},
+		itemOperations: make(map[string]types.ItemOperation),
 	}
 
 	gui.PopupHandler = popup.NewPopupHandler(
@@ -676,7 +755,7 @@ func NewGui(
 		func(ctx goContext.Context, opts types.CreatePopupPanelOpts) {
 			gui.helpers.Confirmation.CreatePopupPanel(ctx, opts)
 		},
-		func() error { return gui.c.Refresh(types.RefreshOptions{Mode: types.ASYNC}) },
+		func() error { gui.c.Refresh(types.RefreshOptions{Mode: types.ASYNC}); return nil },
 		func() { gui.State.ContextMgr.Pop() },
 		func() types.Context { return gui.State.ContextMgr.Current() },
 		gui.createMenu,
@@ -685,7 +764,7 @@ func NewGui(
 			return gui.helpers.AppStatus.WithWaitingStatusSync(message, f)
 		},
 		func(message string, kind types.ToastKind) { gui.helpers.AppStatus.Toast(message, kind) },
-		func() string { return gui.Views.Confirmation.TextArea.GetContent() },
+		func() string { return gui.Views.Prompt.TextArea.GetContent() },
 		func() bool { return gui.c.InDemo() },
 	)
 
@@ -701,7 +780,7 @@ func NewGui(
 		credentialsHelper.PromptUserForCredential,
 	)
 
-	osCommand := oscommands.NewOSCommand(cmn, config, oscommands.GetPlatform(), guiIO)
+	osCommand := oscommands.NewOSCommand(cmn, configurer, oscommands.GetPlatform(), guiIO)
 
 	gui.os = osCommand
 
@@ -711,6 +790,8 @@ func NewGui(
 
 	gui.BackgroundRoutineMgr = &BackgroundRoutineMgr{gui: gui}
 	gui.stateAccessor = &StateAccessor{gui: gui}
+
+	gui.pagerConfig = config.NewPagerConfig(func() *config.UserConfig { return gui.UserConfig() })
 
 	return gui, nil
 }
@@ -804,12 +885,29 @@ func (gui *Gui) Run(startArgs appTypes.StartArgs) error {
 		return err
 	}
 
-	defer gui.checkForDeprecatedEditConfigs()
-
 	gui.g = g
 	defer gui.g.Close()
 
 	g.ErrorHandler = gui.PopupHandler.ErrorHandler
+
+	gui.g.ShouldHandleMouseEvent = func(view *gocui.View, key gocui.KeyName) bool {
+		if gui.helpers.Confirmation.IsPopupPanelFocused() && gui.currentViewName() != view.Name() &&
+			!gocui.IsMouseScrollKey(key) {
+			// we ignore click events on views that aren't popup panels, when a popup panel is focused.
+			// Unless both the current view and the clicked-on view are either commit message or commit
+			// description, or a prompt and the suggestions view, because we want to allow switching
+			// between those two views by clicking.
+			isCommitMessageOrSuggestionsView := func(viewName string) bool {
+				return viewName == "commitMessage" || viewName == "commitDescription" ||
+					viewName == "prompt" || viewName == "suggestions"
+			}
+			if !isCommitMessageOrSuggestionsView(gui.currentViewName()) || !isCommitMessageOrSuggestionsView(view.Name()) {
+				return false
+			}
+		}
+
+		return true
+	}
 
 	// if the deadlock package wants to report a deadlock, we first need to
 	// close the gui so that we can actually read what it prints.
@@ -838,12 +936,19 @@ func (gui *Gui) Run(startArgs appTypes.StartArgs) error {
 
 	gui.BackgroundRoutineMgr.startBackgroundRoutines()
 
+	gui.Helpers().SuspendResume.InstallResumeSignalHandler()
+
 	gui.c.Log.Info("starting main loop")
 
 	// setting here so we can use it in layout.go
 	gui.integrationTest = startArgs.IntegrationTest
 
-	return gui.g.MainLoop()
+	err = gui.g.MainLoop()
+	if errors.Is(err, gocui.ErrQuit) {
+		// Give the focused context a chance to clean up before we tear down the app.
+		gui.c.Context().Current().HandleQuit()
+	}
+	return err
 }
 
 func (gui *Gui) RunAndHandleError(startArgs appTypes.StartArgs) error {
@@ -856,8 +961,7 @@ func (gui *Gui) RunAndHandleError(startArgs appTypes.StartArgs) error {
 
 			close(gui.stopChan)
 
-			switch err {
-			case gocui.ErrQuit:
+			if errors.Is(err, gocui.ErrQuit) {
 				if gui.c.State().GetRetainOriginalDir() {
 					if err := gui.helpers.RecordDirectory.RecordDirectory(gui.InitialDir); err != nil {
 						return err
@@ -869,76 +973,57 @@ func (gui *Gui) RunAndHandleError(startArgs appTypes.StartArgs) error {
 				}
 
 				return nil
-
-			default:
-				return err
 			}
+
+			return err
 		}
 
 		return nil
 	})
 }
 
-func (gui *Gui) checkForDeprecatedEditConfigs() {
-	osConfig := &gui.UserConfig().OS
-	deprecatedConfigs := []struct {
-		config  string
-		oldName string
-		newName string
-	}{
-		{osConfig.EditCommand, "EditCommand", "Edit"},
-		{osConfig.EditCommandTemplate, "EditCommandTemplate", "Edit,EditAtLine"},
-		{osConfig.OpenCommand, "OpenCommand", "Open"},
-		{osConfig.OpenLinkCommand, "OpenLinkCommand", "OpenLink"},
-	}
-	deprecatedConfigStrings := []string{}
-
-	for _, dc := range deprecatedConfigs {
-		if dc.config != "" {
-			deprecatedConfigStrings = append(deprecatedConfigStrings, fmt.Sprintf("   OS.%s -> OS.%s", dc.oldName, dc.newName))
-		}
-	}
-	if len(deprecatedConfigStrings) != 0 {
-		warningMessage := utils.ResolvePlaceholderString(
-			gui.c.Tr.DeprecatedEditConfigWarning,
-			map[string]string{
-				"configs": strings.Join(deprecatedConfigStrings, "\n"),
-			},
-		)
-
-		os.Stdout.Write([]byte(warningMessage))
-	}
-}
-
 // returns whether command exited without error or not
-func (gui *Gui) runSubprocessWithSuspenseAndRefresh(subprocess oscommands.ICmdObj) error {
+func (gui *Gui) runSubprocessWithSuspenseAndRefresh(subprocess *oscommands.CmdObj) error {
 	_, err := gui.runSubprocessWithSuspense(subprocess)
 	if err != nil {
 		return err
 	}
 
-	if err := gui.c.Refresh(types.RefreshOptions{Mode: types.ASYNC}); err != nil {
-		return err
-	}
+	gui.c.Refresh(types.RefreshOptions{Mode: types.ASYNC})
 
 	return nil
 }
 
-// returns whether command exited without error or not
-func (gui *Gui) runSubprocessWithSuspense(subprocess oscommands.ICmdObj) (bool, error) {
-	gui.Mutexes.SubprocessMutex.Lock()
-	defer gui.Mutexes.SubprocessMutex.Unlock()
-
+func (gui *Gui) suspend() error {
 	if err := gui.g.Suspend(); err != nil {
-		return false, err
+		return err
 	}
 
 	gui.BackgroundRoutineMgr.PauseBackgroundRefreshes(true)
-	defer gui.BackgroundRoutineMgr.PauseBackgroundRefreshes(false)
+	return nil
+}
+
+func (gui *Gui) resume() error {
+	if err := gui.g.Resume(); err != nil {
+		return err
+	}
+
+	gui.BackgroundRoutineMgr.PauseBackgroundRefreshes(false)
+	return nil
+}
+
+// returns whether command exited without error or not
+func (gui *Gui) runSubprocessWithSuspense(subprocess *oscommands.CmdObj) (bool, error) {
+	gui.Mutexes.SubprocessMutex.Lock()
+	defer gui.Mutexes.SubprocessMutex.Unlock()
+
+	if err := gui.suspend(); err != nil {
+		return false, err
+	}
 
 	cmdErr := gui.runSubprocess(subprocess)
 
-	if err := gui.g.Resume(); err != nil {
+	if err := gui.resume(); err != nil {
 		return false, err
 	}
 
@@ -949,7 +1034,7 @@ func (gui *Gui) runSubprocessWithSuspense(subprocess oscommands.ICmdObj) (bool, 
 	return true, nil
 }
 
-func (gui *Gui) runSubprocess(cmdObj oscommands.ICmdObj) error { //nolint:unparam
+func (gui *Gui) runSubprocess(cmdObj *oscommands.CmdObj) error {
 	gui.LogCommand(cmdObj.ToString(), true)
 
 	subprocess := cmdObj.GetCmd()
@@ -981,9 +1066,7 @@ func (gui *Gui) loadNewRepo() error {
 		return err
 	}
 
-	if err := gui.c.Refresh(types.RefreshOptions{Mode: types.ASYNC}); err != nil {
-		return err
-	}
+	gui.c.Refresh(types.RefreshOptions{Mode: types.ASYNC})
 
 	if err := gui.os.UpdateWindowTitle(); err != nil {
 		return err
@@ -1003,9 +1086,16 @@ func (gui *Gui) showIntroPopupMessage() {
 			return err
 		}
 
+		introMessage := utils.ResolvePlaceholderString(
+			gui.c.Tr.IntroPopupMessage,
+			map[string]string{
+				"confirmationKey": gui.c.UserConfig().Keybinding.Universal.Confirm,
+			},
+		)
+
 		gui.c.Confirm(types.ConfirmOpts{
 			Title:         "",
-			Prompt:        gui.c.Tr.IntroPopupMessage,
+			Prompt:        introMessage,
 			HandleConfirm: onConfirm,
 			HandleClose:   onConfirm,
 		})
@@ -1094,6 +1184,12 @@ func (gui *Gui) setColorScheme() {
 
 func (gui *Gui) onUIThread(f func() error) {
 	gui.g.Update(func(*gocui.Gui) error {
+		return f()
+	})
+}
+
+func (gui *Gui) onUIThreadContentOnly(f func() error) {
+	gui.g.UpdateContentOnly(func(*gocui.Gui) error {
 		return f()
 	})
 }

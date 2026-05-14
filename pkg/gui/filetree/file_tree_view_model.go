@@ -1,14 +1,16 @@
 package filetree
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
+	"github.com/jesseduffield/lazygit/pkg/common"
 	"github.com/jesseduffield/lazygit/pkg/gui/context/traits"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
+	"github.com/jesseduffield/lazygit/pkg/i18n"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/samber/lo"
-	"github.com/sirupsen/logrus"
 )
 
 type IFileTreeViewModel interface {
@@ -23,16 +25,18 @@ type FileTreeViewModel struct {
 	sync.RWMutex
 	types.IListCursor
 	IFileTree
+	searchHistory *utils.HistoryBuffer[string]
 }
 
 var _ IFileTreeViewModel = &FileTreeViewModel{}
 
-func NewFileTreeViewModel(getFiles func() []*models.File, log *logrus.Entry, showTree bool) *FileTreeViewModel {
-	fileTree := NewFileTree(getFiles, log, showTree)
+func NewFileTreeViewModel(getFiles func() []*models.File, common *common.Common, showTree bool) *FileTreeViewModel {
+	fileTree := NewFileTree(getFiles, common, showTree)
 	listCursor := traits.NewListCursor(fileTree.Len)
 	return &FileTreeViewModel{
-		IFileTree:   fileTree,
-		IListCursor: listCursor,
+		IFileTree:     fileTree,
+		IListCursor:   listCursor,
+		searchHistory: utils.NewHistoryBuffer[string](1000),
 	}
 }
 
@@ -102,8 +106,8 @@ func (self *FileTreeViewModel) SetTree() {
 
 	// for when you stage the old file of a rename and the new file is in a collapsed dir
 	for _, file := range newFiles {
-		if selectedNode != nil && selectedNode.Path != "" && file.PreviousName == selectedNode.Path {
-			self.ExpandToPath(file.Name)
+		if selectedNode != nil && selectedNode.path != "" && file.PreviousPath == selectedNode.path {
+			self.ExpandToPath(file.Path)
 		}
 	}
 
@@ -137,9 +141,8 @@ func (self *FileTreeViewModel) findNewSelectedIdx(prevNodes []*FileNode, currNod
 		}
 		if node.File != nil && node.File.IsRename() {
 			return node.File.Names()
-		} else {
-			return []string{node.Path}
 		}
+		return []string{node.path}
 	}
 
 	for _, prevNode := range prevNodes {
@@ -150,7 +153,7 @@ func (self *FileTreeViewModel) findNewSelectedIdx(prevNodes []*FileNode, currNod
 
 			// If you started off with a rename selected, and now it's broken in two, we want you to jump to the new file, not the old file.
 			// This is because the new should be in the same position as the rename was meaning less cursor jumping
-			foundOldFileInRename := prevNode.File != nil && prevNode.File.IsRename() && node.Path == prevNode.File.PreviousName
+			foundOldFileInRename := prevNode.File != nil && prevNode.File.IsRename() && node.path == prevNode.File.PreviousPath
 			foundNode := utils.StringArraysOverlap(paths, selectedPaths) && !foundOldFileInRename
 			if foundNode {
 				return idx
@@ -177,16 +180,94 @@ func (self *FileTreeViewModel) ToggleShowTree() {
 	if selectedNode == nil {
 		return
 	}
-	path := selectedNode.Path
+	path := selectedNode.path
 
 	if self.InTreeMode() {
 		self.ExpandToPath(path)
 	} else if len(selectedNode.Children) > 0 {
-		path = selectedNode.GetLeaves()[0].Path
+		path = selectedNode.GetLeaves()[0].path
 	}
 
 	index, found := self.GetIndexForPath(path)
 	if found {
 		self.SetSelectedLineIdx(index)
 	}
+}
+
+func (self *FileTreeViewModel) CollapseAll() {
+	selectedNode := self.GetSelected()
+
+	self.IFileTree.CollapseAll()
+	if selectedNode == nil {
+		return
+	}
+
+	topLevelPath := strings.Split(selectedNode.path, "/")[0]
+	index, found := self.GetIndexForPath(topLevelPath)
+	if found {
+		self.SetSelectedLineIdx(index)
+	}
+}
+
+func (self *FileTreeViewModel) ExpandAll() {
+	selectedNode := self.GetSelected()
+
+	self.IFileTree.ExpandAll()
+
+	if selectedNode == nil {
+		return
+	}
+
+	index, found := self.GetIndexForPath(selectedNode.path)
+	if found {
+		self.SetSelectedLineIdx(index)
+	}
+}
+
+// IFilterableContext methods
+
+func (self *FileTreeViewModel) SetFilter(filter string, useFuzzySearch bool) {
+	self.IFileTree.SetTextFilter(filter, useFuzzySearch)
+}
+
+func (self *FileTreeViewModel) GetFilter() string {
+	return self.IFileTree.GetTextFilter()
+}
+
+func (self *FileTreeViewModel) ClearFilter() {
+	selectedNode := self.GetSelected()
+	var selectedPath string
+	if selectedNode != nil {
+		selectedPath = selectedNode.GetInternalPath()
+	}
+
+	self.IFileTree.SetTextFilter("", false)
+
+	if selectedPath != "" {
+		self.ExpandToPath(selectedPath)
+		if idx, found := self.GetIndexForPath(selectedPath); found {
+			self.SetSelection(idx)
+			return
+		}
+	}
+	self.ClampSelection()
+}
+
+func (self *FileTreeViewModel) ReApplyFilter(useFuzzySearch bool) {
+	self.IFileTree.SetTextFilter(self.IFileTree.GetTextFilter(), useFuzzySearch)
+}
+
+func (self *FileTreeViewModel) IsFiltering() bool {
+	return self.IFileTree.GetTextFilter() != ""
+}
+
+// used for type switch
+func (self *FileTreeViewModel) IsFilterableContext() {}
+
+func (self *FileTreeViewModel) FilterPrefix(tr *i18n.TranslationSet) string {
+	return tr.FilterPrefix
+}
+
+func (self *FileTreeViewModel) GetSearchHistory() *utils.HistoryBuffer[string] {
+	return self.searchHistory
 }

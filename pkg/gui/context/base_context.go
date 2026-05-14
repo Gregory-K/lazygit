@@ -1,7 +1,7 @@
 package context
 
 import (
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 )
 
@@ -13,12 +13,15 @@ type BaseContext struct {
 	windowName      string
 	onGetOptionsMap func() map[string]string
 
-	keybindingsFns      []types.KeybindingsFn
-	mouseKeybindingsFns []types.MouseKeybindingsFn
-	onClickFn           func() error
-	onRenderToMainFn    func()
-	onFocusFn           onFocusFn
-	onFocusLostFn       onFocusLostFn
+	keybindingsFns           []types.KeybindingsFn
+	mouseKeybindingsFns      []types.MouseKeybindingsFn
+	onDoubleClickFn          func() error
+	onClickFn                func(opts gocui.ViewMouseBindingOpts) error
+	onClickFocusedMainViewFn onClickFocusedMainViewFn
+	onRenderToMainFn         func()
+	onFocusFns               []onFocusFn
+	onFocusLostFns           []onFocusLostFn
+	onQuitFns                []func()
 
 	focusable                   bool
 	transient                   bool
@@ -31,8 +34,9 @@ type BaseContext struct {
 }
 
 type (
-	onFocusFn     = func(types.OnFocusOpts)
-	onFocusLostFn = func(types.OnFocusLostOpts)
+	onFocusFn                = func(types.OnFocusOpts)
+	onFocusLostFn            = func(types.OnFocusLostOpts)
+	onClickFocusedMainViewFn = func(mainViewName string, clickedLineIdx int) error
 )
 
 var _ types.IBaseContext = &BaseContext{}
@@ -133,49 +137,82 @@ func (self *BaseContext) AddMouseKeybindingsFn(fn types.MouseKeybindingsFn) {
 	self.mouseKeybindingsFns = append(self.mouseKeybindingsFns, fn)
 }
 
-func (self *BaseContext) ClearAllBindingsFn() {
-	self.keybindingsFns = []types.KeybindingsFn{}
-	self.mouseKeybindingsFns = []types.MouseKeybindingsFn{}
+func (self *BaseContext) ClearAllAttachedControllerFunctions() {
+	self.keybindingsFns = nil
+	self.mouseKeybindingsFns = nil
+	self.onFocusFns = nil
+	self.onFocusLostFns = nil
+	self.onQuitFns = nil
+	self.onDoubleClickFn = nil
+	self.onClickFn = nil
+	self.onClickFocusedMainViewFn = nil
+	self.onRenderToMainFn = nil
 }
 
-func (self *BaseContext) AddOnClickFn(fn func() error) {
+func (self *BaseContext) AddOnDoubleClickFn(fn func() error) {
 	if fn != nil {
+		if self.onDoubleClickFn != nil {
+			panic("only one controller is allowed to set an onDoubleClickFn")
+		}
+		self.onDoubleClickFn = fn
+	}
+}
+
+func (self *BaseContext) AddOnClickFn(fn func(opts gocui.ViewMouseBindingOpts) error) {
+	if fn != nil {
+		if self.onClickFn != nil {
+			panic("only one controller is allowed to set an onClickFn")
+		}
 		self.onClickFn = fn
 	}
 }
 
-func (self *BaseContext) GetOnClick() func() error {
+func (self *BaseContext) AddOnClickFocusedMainViewFn(fn onClickFocusedMainViewFn) {
+	if fn != nil {
+		if self.onClickFocusedMainViewFn != nil {
+			panic("only one controller is allowed to set an onClickFocusedMainViewFn")
+		}
+		self.onClickFocusedMainViewFn = fn
+	}
+}
+
+func (self *BaseContext) GetOnDoubleClick() func() error {
+	return self.onDoubleClickFn
+}
+
+func (self *BaseContext) GetOnClick() func(opts gocui.ViewMouseBindingOpts) error {
 	return self.onClickFn
+}
+
+func (self *BaseContext) GetOnClickFocusedMainView() onClickFocusedMainViewFn {
+	return self.onClickFocusedMainViewFn
 }
 
 func (self *BaseContext) AddOnRenderToMainFn(fn func()) {
 	if fn != nil {
+		if self.onRenderToMainFn != nil {
+			panic("only one controller is allowed to set an onRenderToMainFn")
+		}
 		self.onRenderToMainFn = fn
 	}
 }
 
-func (self *BaseContext) GetOnRenderToMain() func() {
-	return self.onRenderToMainFn
-}
-
 func (self *BaseContext) AddOnFocusFn(fn onFocusFn) {
 	if fn != nil {
-		self.onFocusFn = fn
+		self.onFocusFns = append(self.onFocusFns, fn)
 	}
-}
-
-func (self *BaseContext) GetOnFocus() onFocusFn {
-	return self.onFocusFn
 }
 
 func (self *BaseContext) AddOnFocusLostFn(fn onFocusLostFn) {
 	if fn != nil {
-		self.onFocusLostFn = fn
+		self.onFocusLostFns = append(self.onFocusLostFns, fn)
 	}
 }
 
-func (self *BaseContext) GetOnFocusLost() onFocusLostFn {
-	return self.onFocusLostFn
+func (self *BaseContext) AddOnQuitFn(fn func()) {
+	if fn != nil {
+		self.onQuitFns = append(self.onQuitFns, fn)
+	}
 }
 
 func (self *BaseContext) GetMouseKeybindings(opts types.KeybindingsOpts) []*gocui.ViewMouseBinding {

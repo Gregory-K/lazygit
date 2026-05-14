@@ -1,7 +1,9 @@
 package helpers
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -9,7 +11,6 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/config"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 	"github.com/samber/lo"
-	"golang.org/x/exp/slices"
 )
 
 // The best way to add test cases here is to set your args and then get the
@@ -18,21 +19,20 @@ import (
 func TestGetWindowDimensions(t *testing.T) {
 	getDefaultArgs := func() WindowArrangementArgs {
 		return WindowArrangementArgs{
-			Width:               75,
-			Height:              30,
-			UserConfig:          config.GetDefaultConfig(),
-			CurrentWindow:       "files",
-			CurrentSideWindow:   "files",
-			CurrentStaticWindow: "files",
-			SplitMainPanel:      false,
-			ScreenMode:          types.SCREEN_NORMAL,
-			AppStatus:           "",
-			InformationStr:      "information",
-			ShowExtrasWindow:    false,
-			InDemo:              false,
-			IsAnyModeActive:     false,
-			InSearchPrompt:      false,
-			SearchPrefix:        "",
+			Width:             75,
+			Height:            30,
+			UserConfig:        config.GetDefaultConfig(),
+			CurrentWindow:     "files",
+			CurrentSideWindow: "files",
+			SplitMainPanel:    false,
+			ScreenMode:        types.SCREEN_NORMAL,
+			AppStatus:         "",
+			InformationStr:    "information",
+			ShowExtrasWindow:  false,
+			InDemo:            false,
+			IsAnyModeActive:   false,
+			InSearchPrompt:    false,
+			SearchPrefix:      "",
 		}
 	}
 
@@ -203,9 +203,89 @@ func TestGetWindowDimensions(t *testing.T) {
 			`,
 		},
 		{
+			name: "0.5 SidePanelWidth",
+			mutateArgs: func(args *WindowArrangementArgs) {
+				args.UserConfig.Gui.SidePanelWidth = 0.5
+			},
+			expected: `
+			╭status──────────────────────────────╮╭main───────────────────────────────╮
+			│                                    ││                                   │
+			╰────────────────────────────────────╯│                                   │
+			╭files───────────────────────────────╮│                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			╰────────────────────────────────────╯│                                   │
+			╭branches────────────────────────────╮│                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			╰────────────────────────────────────╯│                                   │
+			╭commits─────────────────────────────╮│                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			│                                    ││                                   │
+			╰────────────────────────────────────╯│                                   │
+			╭stash───────────────────────────────╮│                                   │
+			│                                    ││                                   │
+			╰────────────────────────────────────╯╰───────────────────────────────────╯
+			<options──────────────────────────────────────────────────────>A<B────────>
+			A: statusSpacer1
+			B: information
+			`,
+		},
+		{
+			name: "0.8 SidePanelWidth",
+			mutateArgs: func(args *WindowArrangementArgs) {
+				args.UserConfig.Gui.SidePanelWidth = 0.8
+			},
+			expected: `
+			╭status────────────────────────────────────────────────────╮╭main─────────╮
+			│                                                          ││             │
+			╰──────────────────────────────────────────────────────────╯│             │
+			╭files─────────────────────────────────────────────────────╮│             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			╰──────────────────────────────────────────────────────────╯│             │
+			╭branches──────────────────────────────────────────────────╮│             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			╰──────────────────────────────────────────────────────────╯│             │
+			╭commits───────────────────────────────────────────────────╮│             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			│                                                          ││             │
+			╰──────────────────────────────────────────────────────────╯│             │
+			╭stash─────────────────────────────────────────────────────╮│             │
+			│                                                          ││             │
+			╰──────────────────────────────────────────────────────────╯╰─────────────╯
+			<options──────────────────────────────────────────────────────>A<B────────>
+			A: statusSpacer1
+			B: information
+			`,
+		},
+		{
 			name: "half screen mode, enlargedSideViewLocation left",
 			mutateArgs: func(args *WindowArrangementArgs) {
-				args.Height = 20 // smaller height because we don't more here
+				args.Height = 20 // smaller height because we don't need more here
 				args.ScreenMode = types.SCREEN_HALF
 				args.UserConfig.Gui.EnlargedSideViewLocation = "left"
 			},
@@ -237,7 +317,7 @@ func TestGetWindowDimensions(t *testing.T) {
 		{
 			name: "half screen mode, enlargedSideViewLocation top",
 			mutateArgs: func(args *WindowArrangementArgs) {
-				args.Height = 20 // smaller height because we don't more here
+				args.Height = 20 // smaller height because we don't need more here
 				args.ScreenMode = types.SCREEN_HALF
 				args.UserConfig.Gui.EnlargedSideViewLocation = "top"
 			},
@@ -262,6 +342,105 @@ func TestGetWindowDimensions(t *testing.T) {
 			│                                                                         │
 			╰─────────────────────────────────────────────────────────────────────────╯
 			<options──────────────────────────────────────────────────────>A<B────────>
+			A: statusSpacer1
+			B: information
+			`,
+		},
+		{
+			name: "portrait auto mode, enabled",
+			mutateArgs: func(args *WindowArrangementArgs) {
+				args.Width = 50
+				args.Height = 20
+				args.UserConfig.Gui.PortraitModeAutoMaxWidth = 50
+				args.UserConfig.Gui.PortraitModeAutoMinHeight = 20
+			},
+			expected: `
+			<status──────────────────────────────────────────>
+			╭files───────────────────────────────────────────╮
+			│                                                │
+			╰────────────────────────────────────────────────╯
+			<branches────────────────────────────────────────>
+			<commits─────────────────────────────────────────>
+			<stash───────────────────────────────────────────>
+			╭main────────────────────────────────────────────╮
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			│                                                │
+			╰────────────────────────────────────────────────╯
+			<options─────────────────────────────>A<B────────>
+			A: statusSpacer1
+			B: information
+			`,
+		},
+		{
+			name: "portrait auto mode, disabled because width is too large",
+			mutateArgs: func(args *WindowArrangementArgs) {
+				args.Width = 50
+				args.Height = 20
+				args.UserConfig.Gui.PortraitModeAutoMaxWidth = 49
+				args.UserConfig.Gui.PortraitModeAutoMinHeight = 20
+			},
+			expected: `
+			<status─────────>╭main───────────────────────────╮
+			╭files──────────╮│                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			╰───────────────╯│                               │
+			<branches───────>│                               │
+			<commits────────>│                               │
+			<stash──────────>╰───────────────────────────────╯
+			<options─────────────────────────────>A<B────────>
+			A: statusSpacer1
+			B: information
+			`,
+		},
+		{
+			name: "portrait auto mode, disabled because height is too small",
+			mutateArgs: func(args *WindowArrangementArgs) {
+				args.Width = 50
+				args.Height = 20
+				args.UserConfig.Gui.PortraitModeAutoMaxWidth = 50
+				args.UserConfig.Gui.PortraitModeAutoMinHeight = 21
+			},
+			expected: `
+			<status─────────>╭main───────────────────────────╮
+			╭files──────────╮│                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			│               ││                               │
+			╰───────────────╯│                               │
+			<branches───────>│                               │
+			<commits────────>│                               │
+			<stash──────────>╰───────────────────────────────╯
+			<options─────────────────────────────>A<B────────>
 			A: statusSpacer1
 			B: information
 			`,
@@ -410,19 +589,16 @@ func renderLayout(windows map[string]boxlayout.Dimensions) string {
 	// Sort first by name, then by position. This means our short labels will
 	// increment in the order that the windows appear on the screen.
 	slices.Sort(windowNames)
-	slices.SortStableFunc(windowNames, func(a, b string) bool {
+	slices.SortStableFunc(windowNames, func(a, b string) int {
 		dimensionsA := windows[a]
 		dimensionsB := windows[b]
-		if dimensionsA.Y0 < dimensionsB.Y0 {
-			return true
+		if dimensionsA.Y0 != dimensionsB.Y0 {
+			return cmp.Compare(dimensionsA.Y0, dimensionsB.Y0)
 		}
-		if dimensionsA.Y0 > dimensionsB.Y0 {
-			return false
-		}
-		return dimensionsA.X0 < dimensionsB.X0
+		return cmp.Compare(dimensionsA.X0, dimensionsB.X0)
 	})
 
-	// Uniquefy windows by dimensions (so perfectly overlapping windows are de-duped). This prevents getting 'fileshes' as a label where the files and branches windows overlap.
+	// Uniquify windows by dimensions (so perfectly overlapping windows are de-duped). This prevents getting 'fileshes' as a label where the files and branches windows overlap.
 	// branches windows overlap.
 	windowNames = lo.UniqBy(windowNames, func(windowName string) boxlayout.Dimensions {
 		return windows[windowName]

@@ -8,7 +8,7 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/lucasb-eyer/go-colorful"
-	"github.com/mattn/go-runewidth"
+	"github.com/rivo/uniseg"
 )
 
 type authorNameCacheKey struct {
@@ -21,7 +21,7 @@ type authorNameCacheKey struct {
 var (
 	authorInitialCache = make(map[string]string)
 	authorNameCache    = make(map[authorNameCacheKey]string)
-	authorStyleCache   = make(map[string]style.TextStyle)
+	authorStyleCache   = make(map[string]*style.TextStyle)
 )
 
 const authorNameWildcard = "*"
@@ -73,7 +73,7 @@ func AuthorWithLength(authorName string, length int) string {
 	return LongAuthor(authorName, length)
 }
 
-func AuthorStyle(authorName string) style.TextStyle {
+func AuthorStyle(authorName string) *style.TextStyle {
 	if value, ok := authorStyleCache[authorName]; ok {
 		return value
 	}
@@ -85,9 +85,9 @@ func AuthorStyle(authorName string) style.TextStyle {
 
 	value := trueColorStyle(authorName)
 
-	authorStyleCache[authorName] = value
+	authorStyleCache[authorName] = &value
 
-	return value
+	return &value
 }
 
 func trueColorStyle(str string) style.TextStyle {
@@ -114,9 +114,9 @@ func getInitials(authorName string) string {
 		return authorName
 	}
 
-	firstRune := getFirstRune(authorName)
-	if runewidth.RuneWidth(firstRune) > 1 {
-		return string(firstRune)
+	firstChar, _, width, _ := uniseg.FirstGraphemeClusterInString(authorName, -1)
+	if width > 1 {
+		return firstChar
 	}
 
 	split := strings.Split(authorName, " ")
@@ -125,15 +125,6 @@ func getInitials(authorName string) string {
 	}
 
 	return utils.LimitStr(split[0], 1) + utils.LimitStr(split[1], 1)
-}
-
-func getFirstRune(str string) rune {
-	// just using the loop for the sake of getting the first rune
-	for _, r := range str {
-		return r
-	}
-	// should never land here
-	return 0
 }
 
 func SetCustomAuthors(customAuthorColors map[string]string) {

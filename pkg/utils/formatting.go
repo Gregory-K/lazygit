@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mattn/go-runewidth"
+	"github.com/rivo/uniseg"
 	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
 )
@@ -25,9 +25,9 @@ type ColumnConfig struct {
 func StringWidth(s string) int {
 	// We are intentionally not using a range loop here, because that would
 	// convert the characters to runes, which is unnecessary work in this case.
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] > unicode.MaxASCII {
-			return runewidth.StringWidth(s)
+			return uniseg.StringWidth(s)
 		}
 	}
 
@@ -44,9 +44,8 @@ func WithPadding(str string, padding int, alignment Alignment) string {
 	space := strings.Repeat(" ", padding-width)
 	if alignment == AlignLeft {
 		return str + space
-	} else {
-		return space + str
 	}
+	return space + str
 }
 
 // defaults to left-aligning each column. If you want to set the alignment of
@@ -178,18 +177,33 @@ func MaxFn[T any](items []T, fn func(T) int) int {
 
 // TruncateWithEllipsis returns a string, truncated to a certain length, with an ellipsis
 func TruncateWithEllipsis(str string, limit int) string {
-	if StringWidth(str) > limit && limit <= 2 {
+	if StringWidth(str) <= limit {
+		return str
+	}
+	if limit <= 2 {
 		return strings.Repeat(".", limit)
 	}
-	return runewidth.Truncate(str, limit, "…")
+
+	state := -1
+	var grapheme string
+	var width int
+	truncatedStr := ""
+
+	for str != "" {
+		grapheme, str, width, state = uniseg.FirstGraphemeClusterInString(str, state)
+		if uniseg.StringWidth(truncatedStr)+width > limit-1 {
+			break
+		}
+		truncatedStr += grapheme
+	}
+	return truncatedStr + "…"
 }
 
 func SafeTruncate(str string, limit int) string {
 	if len(str) > limit {
 		return str[0:limit]
-	} else {
-		return str
 	}
+	return str
 }
 
 const COMMIT_HASH_SHORT_SIZE = 8

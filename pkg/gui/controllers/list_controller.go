@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 )
 
@@ -74,6 +74,9 @@ func (self *ListController) scrollHorizontal(scrollFunc func()) error {
 	scrollFunc()
 
 	self.context.HandleFocus(types.OnFocusOpts{})
+	if self.context.NeedsRerenderOnWidthChange() == types.NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_WIDTH_CHANGES {
+		self.context.HandleRender()
+	}
 	return nil
 }
 
@@ -98,36 +101,105 @@ func (self *ListController) handleLineChangeAux(f func(int), change int) error {
 	rangeAfter := list.IsSelectingRange()
 	after := list.GetSelectedLineIdx()
 
-	if err := self.pushContextIfNotFocused(); err != nil {
-		return err
-	}
-
 	// doing this check so that if we're holding the up key at the start of the list
 	// we're not constantly re-rendering the main view.
 	cursorMoved := before != after
+	originYBefore := self.context.GetView().OriginY()
 	if cursorMoved {
-		if change == -1 {
+		switch change {
+		case -1:
 			checkScrollUp(self.context.GetViewTrait(), self.c.UserConfig(),
 				self.context.ModelIndexToViewIndex(before), self.context.ModelIndexToViewIndex(after))
-		} else if change == 1 {
+		case 1:
 			checkScrollDown(self.context.GetViewTrait(), self.c.UserConfig(),
 				self.context.ModelIndexToViewIndex(before), self.context.ModelIndexToViewIndex(after))
 		}
 	}
 
 	if cursorMoved || rangeBefore != rangeAfter {
-		self.context.HandleFocus(types.OnFocusOpts{})
+		if originYBefore != self.context.GetView().OriginY() {
+			// Since we already scrolled the view above, the normal mechanism that
+			// ListContextTrait.FocusLine uses for deciding whether rerendering is needed won't
+			// work. It is based on checking whether the origin was changed by the call to
+			// FocusPoint in that function, but since we scrolled the view directly above, the
+			// origin has already been updated. So we must tell it explicitly to rerender.
+			self.context.SetNeedRerenderVisibleLines()
+		}
+
+		self.context.HandleFocus(types.OnFocusOpts{ScrollSelectionIntoView: true})
+	} else {
+		// If the selection did not change (because, for example, we are at the top of the list and
+		// press up), we still want to ensure that the selection is visible. This is useful after
+		// scrolling the selection out of view with the mouse.
+		self.context.FocusLine(true)
 	}
 
 	return nil
 }
 
 func (self *ListController) HandlePrevPage() error {
-	return self.handleLineChange(-self.context.GetViewTrait().PageDelta())
+	return self.handlePageChange(-self.context.GetViewTrait().PageDelta())
 }
 
 func (self *ListController) HandleNextPage() error {
-	return self.handleLineChange(self.context.GetViewTrait().PageDelta())
+	return self.handlePageChange(self.context.GetViewTrait().PageDelta())
+}
+
+func (self *ListController) handlePageChange(delta int) error {
+	list := self.context.GetList()
+	view := self.context.GetViewTrait()
+
+	before := list.GetSelectedLineIdx()
+
+	viewPortStart, viewPortHeight := view.ViewPortYBounds()
+	beforeViewIdx := self.context.ModelIndexToViewIndex(before)
+	afterViewIdx := beforeViewIdx + delta
+	newModelIndex := self.context.ViewIndexToModelIndex(afterViewIdx)
+
+	if delta < 0 {
+		// Previous page: keep selection at top of viewport
+		indexAtTopOfPage := self.context.ViewIndexToModelIndex(viewPortStart)
+		if before != indexAtTopOfPage {
+			// If the selection isn't already at the top of the page, move it there without scrolling
+			list.MoveSelectedLine(indexAtTopOfPage - before)
+		} else {
+			// Otherwise, move the selection by one page and scroll
+			list.MoveSelectedLine(newModelIndex - before)
+
+			linesToScroll := afterViewIdx - viewPortStart
+			if linesToScroll < 0 {
+				view.ScrollUp(-linesToScroll)
+			}
+		}
+	} else {
+		// Next page: keep selection at bottom of viewport
+		indexAtBottomOfPage := self.context.ViewIndexToModelIndex(viewPortStart + viewPortHeight - 1)
+		if before != indexAtBottomOfPage {
+			// If the selection isn't already at the bottom of the page, move it there without scrolling
+			list.MoveSelectedLine(indexAtBottomOfPage - before)
+		} else {
+			// Otherwise, move the selection by one page and scroll
+			list.MoveSelectedLine(newModelIndex - before)
+
+			linesToScroll := afterViewIdx - (viewPortStart + viewPortHeight - 1)
+			if linesToScroll > 0 {
+				view.ScrollDown(linesToScroll)
+			}
+		}
+	}
+
+	// Since we already scrolled the view above, the normal mechanism that
+	// ListContextTrait.FocusLine uses for deciding whether rerendering is needed won't work. It is
+	// based on checking whether the origin was changed by the call to FocusPoint in that function,
+	// but since we scrolled the view directly above, the origin has already been updated. So we
+	// must tell it explicitly to rerender.
+	self.context.SetNeedRerenderVisibleLines()
+
+	// Since we are maintaining the scroll position ourselves above, there's no point in passing
+	// ScrollSelectionIntoView=true here.
+	self.context.HandleFocus(types.OnFocusOpts{})
+
+	return nil
 }
 
 func (self *ListController) HandleGotoTop() error {
@@ -135,7 +207,9 @@ func (self *ListController) HandleGotoTop() error {
 }
 
 func (self *ListController) HandleGotoBottom() error {
-	return self.handleLineChange(self.context.GetList().Len())
+	bottomIdx := self.context.IndexForGotoBottom()
+	change := bottomIdx - self.context.GetList().GetSelectedLineIdx()
+	return self.handleLineChange(change)
 }
 
 func (self *ListController) HandleToggleRangeSelect() error {
@@ -156,7 +230,6 @@ func (self *ListController) HandleRangeSelectUp() error {
 }
 
 func (self *ListController) HandleClick(opts gocui.ViewMouseBindingOpts) error {
-	prevSelectedLineIdx := self.context.GetList().GetSelectedLineIdx()
 	newSelectedLineIdx := self.context.ViewIndexToModelIndex(opts.Y)
 	alreadyFocused := self.isFocused()
 
@@ -170,16 +243,23 @@ func (self *ListController) HandleClick(opts gocui.ViewMouseBindingOpts) error {
 
 	self.context.GetList().SetSelection(newSelectedLineIdx)
 
-	if prevSelectedLineIdx == newSelectedLineIdx && alreadyFocused && self.context.GetOnClick() != nil {
-		return self.context.GetOnClick()()
+	if opts.IsDoubleClick && alreadyFocused && self.context.GetOnDoubleClick() != nil {
+		return self.context.GetOnDoubleClick()()
 	}
+
 	self.context.HandleFocus(types.OnFocusOpts{})
+
+	// Let view-specific controllers do additional click handling
+	if self.context.GetOnClick() != nil {
+		return self.context.GetOnClick()(opts)
+	}
+
 	return nil
 }
 
 func (self *ListController) pushContextIfNotFocused() error {
 	if !self.isFocused() {
-		self.c.Context().Push(self.context)
+		self.c.Context().Push(self.context, types.OnFocusOpts{})
 	}
 
 	return nil
@@ -197,10 +277,12 @@ func (self *ListController) GetKeybindings(opts types.KeybindingsOpts) []*types.
 		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.NextItem), Handler: self.HandleNextLine},
 		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.PrevPage), Handler: self.HandlePrevPage, Description: self.c.Tr.PrevPage},
 		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.NextPage), Handler: self.HandleNextPage, Description: self.c.Tr.NextPage},
-		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.GotoTop), Handler: self.HandleGotoTop, Description: self.c.Tr.GotoTop},
+		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.GotoTop), Handler: self.HandleGotoTop, Description: self.c.Tr.GotoTop, Alternative: "<home>"},
+		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.GotoBottom), Handler: self.HandleGotoBottom, Description: self.c.Tr.GotoBottom, Alternative: "<end>"},
+		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.GotoTopAlt), Handler: self.HandleGotoTop},
+		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.GotoBottomAlt), Handler: self.HandleGotoBottom},
 		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.ScrollLeft), Handler: self.HandleScrollLeft},
 		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.ScrollRight), Handler: self.HandleScrollRight},
-		{Tag: "navigation", Key: opts.GetKey(opts.Config.Universal.GotoBottom), Handler: self.HandleGotoBottom, Description: self.c.Tr.GotoBottom},
 	}
 
 	if self.context.RangeSelectEnabled() {

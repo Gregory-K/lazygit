@@ -1,23 +1,42 @@
 # Contributing
 
-♥ We love pull requests from everyone !
+This project does not accept pull requests.
 
-When contributing to this repository, please first discuss the change you wish
-to make via issue, email, or any other method with the owners of this repository
-before making a change.
+In todays world of agentic coding I have decided that it no longer makes sense for me to look at incoming pull requests. As far as I can tell, the vast majority of these is AI-generated these days, which in itself is not necessarily a bad thing; however, there's no way for me to tell whether the person posting the PR actually understands anything about the code that is being contributed or not, and I don't feel like spending time and energy on finding out whether they do.
+
+Now you might ask why this even matters; coding agents are capable of producing amazingly high-quality code, so why is it important that the person opening the PR understands it, as long as the code works and tests are green? It does actually matter very much to me. AI generated code needs to be carefully reviewed and iterated on, and it is the contributor's job to do that, not mine. And I have no idea to what extent the contributor has done this, or whether they are even capable of it.
+
+Every PR needs work and iterations until it is mergeable, whether manually coded or AI generated (even very good ones do), and if I don't know whether the person posting the PR will act on my review feedback themselves or just pass it on to their coding agent (which I guess is the much more likely case today), then it doesn't make sense for me to work with them.
+
+For this reason I will close incoming pull requests by default from now on, without comment. Sorry if this sounds hostile, but honestly I don't feel I have much of a choice if I want maintaining this project to still be enjoyable for me.
+
+With that said, if you are indeed serious about contributing a high-quality PR to lazygit, and you are familiar with go, and you have learned enough about lazygit's code base to tell whether your changes are good, then do raise an issue and explain what you are planning to do, and somehow make it plausible that your PR will be worth my time reviewing it. In such a case I might make an exception from the default rule.
+
+In the future I might also consider adopting a vouch system similar to [Ghostty's](https://github.com/ghostty-org/ghostty/blob/main/CONTRIBUTING.md#first-time-contributors), but right now I feel the effort needed to set this up and maintain is not justified given the rather low number of high-quality contributions I have seen in recent times.
+
+Even though we no longer accept pull requests, I find it important to emphasize that Lazygit is still a community project, and non-PR contributions are still very welcome. Do file issues for bug reports or feature requests, and help shape the future of lazygit by actively participating in discussing UX designs. Also, the localization system very much depends on everybody's help with translating texts (see https://crowdin.com/project/lazygit).
+
+---
+
+The remainder of this document is the old version from a time when contributing pull requests was still encouraged. Keeping it here in case I reconsider my policy in the future.
 
 ## PR walkthrough
 
 [This video](https://www.youtube.com/watch?v=kNavnhzZHtk) walks through the process of adding a small feature to lazygit. If you have no idea where to start, watching that video is a good first step.
 
+## Design principles
+
+See [here](./VISION.md) for a set of design principles that we want to consider when building a feature or making a change.
+
 ## Codebase guide
 
 [This doc](./docs/dev/Codebase_Guide.md) explains:
-* what the different packages in the codebase are for
-* where important files live
-* important concepts in the code
-* how the event loop works
-* other useful information
+
+- what the different packages in the codebase are for
+- where important files live
+- important concepts in the code
+- how the event loop works
+- other useful information
 
 ## All code changes happen through Pull Requests
 
@@ -26,13 +45,29 @@ welcome your pull requests:
 
 1. Fork the repo and create your branch from `master`.
 2. If you've added code that should be tested, add tests.
-3. If you've added code that need documentation, update the documentation.
+3. If you've added code that needs documentation, update the documentation.
 4. Write a [good commit message](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 5. Issue that pull request!
 
 Please do not raise pull request from your fork's master branch: make a feature branch instead. Lazygit maintainers will sometimes push changes to your branch when reviewing a PR and we often can't do this if you use your master branch.
 
 If you've never written Go in your life, then join the club! Lazygit was the maintainer's first Go program, and most contributors have never used Go before. Go is widely considered an easy-to-learn language, so if you're looking for an open source project to gain dev experience, you've come to the right place.
+
+## Commit history
+
+We value a clean and useful commit history, so please take some time to organize your commits so that they make sense. Don't assume that they will be squashed on merge anyway; we don't do that here.
+
+In particular:
+
+- Refactorings and behavior changes should be in separate commits. There are very few exceptions where this is not possible, but in my experience they are very rare.
+- Strive for minimal commits; every change that is independent from other changes should be in a commit of its own (with a good commit message that explains why the change is made).
+- When you need to iterate over your implementation during review (e.g. because you discovered a bug, or a maintainer requested changes), don't just pile new commits on top. Use fixup commits to make your changes transparent while still maintaining a good commit history. If you don't know what that means, [here's a brief introduction](docs/Fixup_Commits.md).
+
+## A note about AI
+
+It has become common recently to throw an issue at a coding agent and submit whatever comes out of it as a PR. This is not appreciated here, and I will close PRs where I can tell this was the case, or where I even suspect it was the case.
+
+Some of these PRs may actually be good and useful, but many are not, and it's not a good use of my time as a maintainer to look at generated PRs to decide. This is the job of the PR's contributor, and if you don't speak enough go or can't be bothered to get familiar enough with lazygit's codebase to tell, then don't contribute the PR.
 
 ## Running in a VSCode dev container
 
@@ -41,8 +76,9 @@ If you want to spare yourself the hassle of setting up your dev environment your
 ![image](https://user-images.githubusercontent.com/8456633/201500508-0d55f99f-5035-4a6f-a0f8-eaea5c003e5d.png)
 
 This requires that:
-* you have docker installed
-* you have the dev containers extension installed in VSCode
+
+- you have docker installed
+- you have the dev containers extension installed in VSCode
 
 See [here](https://code.visualstudio.com/docs/devcontainers/containers) for more info about dev containers.
 
@@ -55,6 +91,32 @@ If you want to start contributing to Lazygit with the click of a button, you can
 To run lazygit from within the integrated terminal just go `go run main.go`
 
 This allows you to contribute to Lazygit without needing to install anything on your local machine. The Codespace has all the necessary tools and extensions pre-installed.
+
+## Using Nix for development
+
+If you use Nix, you can leverage the included flake to set up a complete development environment with all necessary dependencies:
+
+```sh
+nix develop
+```
+
+This will drop you into a development shell that includes:
+
+- Latest Go toolchain
+- golangci-lint for code linting
+- git and make
+
+You can also build and run lazygit using nix:
+
+```sh
+# Build lazygit
+nix build
+
+# Run lazygit directly
+nix run
+```
+
+The nix flake supports multiple architectures (x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin) and provides a consistent development environment across different systems.
 
 ## Code of conduct
 
@@ -114,9 +176,23 @@ Lazygit supports [Nerd Fonts](https://www.nerdfonts.com) to render certain icons
 
 ## Internationalisation
 
-Boy that's a hard word to spell. Anyway, lazygit is translated into several languages within the pkg/i18n package. If you need to render text to the user, you should add a new field to the TranslationSet struct in `pkg/i18n/english.go` and add the actual content within the `EnglishTranslationSet()` method in the same file. Then you can access via `gui.Tr.YourNewText` (or `self.c.Tr.YourNewText`, etc). Although it is appreciated if you translate the text into other languages, it's not expected of you (google translate will likely do a bad job anyway!).
+Boy that's a hard word to spell. Anyway, lazygit is translated into several languages within the pkg/i18n package.
+
+### For developers adding new text
+
+If you need to render text to the user, you should add a new field to the TranslationSet struct in `pkg/i18n/english.go` and add the actual content within the `EnglishTranslationSet()` method in the same file. Then you can access via `gui.Tr.YourNewText` (or `self.c.Tr.YourNewText`, etc).
 
 Note, we use 'Sentence case' for everything (so no 'Title Case' or 'whatever-it's-called-when-there's-no-capital-letters-case')
+
+### For translators
+
+Lazygit translations are managed through [Crowdin](https://crowdin.com/project/lazygit/). If you'd like to contribute translations:
+
+1. Join the Crowdin project at https://crowdin.com/project/lazygit/
+2. Select your target language and help translate missing strings
+3. The translation files in `pkg/i18n/translations/` are managed by the maintainers - please don't edit them directly
+
+For detailed information about the translation process, including how maintainers sync translations, see `pkg/i18n/translations/README.md`.
 
 ## Debugging
 

@@ -1,7 +1,7 @@
 package gui
 
 import (
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 )
 
@@ -20,10 +20,7 @@ func (gui *Gui) runTaskForView(view *gocui.View, task types.UpdateTask) error {
 		return gui.newCmdTask(view, v.Cmd, v.Prefix)
 
 	case *types.RunPtyTask:
-		gui.afterLayout(func() error {
-			return gui.newPtyTask(view, v.Cmd, v.Prefix)
-		})
-		return nil
+		return gui.newPtyTask(view, v.Cmd, v.Prefix)
 	}
 
 	return nil

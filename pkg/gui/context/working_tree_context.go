@@ -1,7 +1,6 @@
 package context
 
 import (
-	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/gui/filetree"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
@@ -13,31 +12,30 @@ import (
 type WorkingTreeContext struct {
 	*filetree.FileTreeViewModel
 	*ListContextTrait
-	*SearchTrait
 }
 
 var (
 	_ types.IListContext       = (*WorkingTreeContext)(nil)
-	_ types.ISearchableContext = (*WorkingTreeContext)(nil)
+	_ types.IFilterableContext = (*WorkingTreeContext)(nil)
 )
 
 func NewWorkingTreeContext(c *ContextCommon) *WorkingTreeContext {
 	viewModel := filetree.NewFileTreeViewModel(
 		func() []*models.File { return c.Model().Files },
-		c.Log,
+		c.Common,
 		c.UserConfig().Gui.ShowFileTree,
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
 		showFileIcons := icons.IsIconEnabled() && c.UserConfig().Gui.ShowFileIcons
-		lines := presentation.RenderFileTree(viewModel, c.Model().Submodules, showFileIcons)
+		showNumstat := c.UserConfig().Gui.ShowNumstatInFilesView
+		lines := presentation.RenderFileTree(viewModel, c.Model().Submodules, showFileIcons, showNumstat, &c.UserConfig().Gui.CustomIcons, c.UserConfig().Gui.ShowRootItemInFileTree)
 		return lo.Map(lines, func(line string, _ int) []string {
 			return []string{line}
 		})
 	}
 
 	ctx := &WorkingTreeContext{
-		SearchTrait:       NewSearchTrait(c),
 		FileTreeViewModel: viewModel,
 		ListContextTrait: &ListContextTrait{
 			Context: NewSimpleContext(NewBaseContext(NewBaseContextOpts{
@@ -55,11 +53,5 @@ func NewWorkingTreeContext(c *ContextCommon) *WorkingTreeContext {
 		},
 	}
 
-	ctx.GetView().SetOnSelectItem(ctx.SearchTrait.onSelectItemWrapper(ctx.OnSearchSelect))
-
 	return ctx
-}
-
-func (self *WorkingTreeContext) ModelSearchResults(searchStr string, caseSensitive bool) []gocui.SearchPosition {
-	return nil
 }

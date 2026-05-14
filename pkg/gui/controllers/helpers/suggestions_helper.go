@@ -2,15 +2,14 @@ package helpers
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/generics/set"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
 	"github.com/jesseduffield/lazygit/pkg/utils"
-	"github.com/jesseduffield/minimal/gitignore"
 	"github.com/samber/lo"
 	"golang.org/x/exp/slices"
 	"gopkg.in/ozeidan/fuzzy-patricia.v3/patricia"
@@ -26,19 +25,9 @@ import (
 // finding suggestions in this file, so that it's easy to see if a function already
 // exists for fetching a particular model.
 
-type ISuggestionsHelper interface {
-	GetRemoteSuggestionsFunc() func(string) []*types.Suggestion
-	GetBranchNameSuggestionsFunc() func(string) []*types.Suggestion
-	GetFilePathSuggestionsFunc() func(string) []*types.Suggestion
-	GetRemoteBranchesSuggestionsFunc(separator string) func(string) []*types.Suggestion
-	GetRefsSuggestionsFunc() func(string) []*types.Suggestion
-}
-
 type SuggestionsHelper struct {
 	c *HelperCommon
 }
-
-var _ ISuggestionsHelper = &SuggestionsHelper{}
 
 func NewSuggestionsHelper(
 	c *HelperCommon,
@@ -99,25 +88,31 @@ func (self *SuggestionsHelper) GetBranchNameSuggestionsFunc() func(string) []*ty
 // self.c.Model().FilesTrie. On the main thread we'll be doing a fuzzy search via
 // self.c.Model().FilesTrie. So if we've looked for a file previously, we'll start with
 // the old trie and eventually it'll be swapped out for the new one.
-// Notably, unlike other suggestion functions we're not showing all the options
-// if nothing has been typed because there'll be too much to display efficiently
 func (self *SuggestionsHelper) GetFilePathSuggestionsFunc() func(string) []*types.Suggestion {
 	_ = self.c.WithWaitingStatus(self.c.Tr.LoadingFileSuggestions, func(gocui.Task) error {
 		trie := patricia.NewTrie()
-		// load every non-gitignored file in the repo
-		ignore, err := gitignore.FromGit()
+
+		// load every file in the repo
+		files, err := self.c.Git().WorkingTree.AllRepoFiles()
 		if err != nil {
 			return err
 		}
 
-		err = ignore.Walk(".",
-			func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
+		seen := set.New[string]()
+		for _, file := range files {
+			// For every file we also want to add its parent directories, but only once.
+			for i := range len(file) {
+				if file[i] == '/' {
+					dir := file[:i]
+					if !seen.Includes(dir) {
+						trie.Insert(patricia.Prefix(dir), dir)
+						seen.Add(dir)
+					}
 				}
-				trie.Insert(patricia.Prefix(path), path)
-				return nil
-			})
+			}
+
+			trie.Insert(patricia.Prefix(file), file)
+		}
 
 		// cache the trie for future use
 		self.c.Model().FilesTrie = trie
@@ -162,8 +157,24 @@ func (self *SuggestionsHelper) getRemoteBranchNames(separator string) []string {
 	})
 }
 
+func (self *SuggestionsHelper) getRemoteBranchNamesForRemote(remoteName string) []string {
+	remote, ok := lo.Find(self.c.Model().Remotes, func(remote *models.Remote) bool {
+		return remote.Name == remoteName
+	})
+	if ok {
+		return lo.Map(remote.Branches, func(branch *models.RemoteBranch, _ int) string {
+			return branch.Name
+		})
+	}
+	return nil
+}
+
 func (self *SuggestionsHelper) GetRemoteBranchesSuggestionsFunc(separator string) func(string) []*types.Suggestion {
 	return FilterFunc(self.getRemoteBranchNames(separator), self.c.UserConfig().Gui.UseFuzzySearch())
+}
+
+func (self *SuggestionsHelper) GetRemoteBranchesForRemoteSuggestionsFunc(remoteName string) func(string) []*types.Suggestion {
+	return FilterFunc(self.getRemoteBranchNamesForRemote(remoteName), self.c.UserConfig().Gui.UseFuzzySearch())
 }
 
 func (self *SuggestionsHelper) getTagNames() []string {

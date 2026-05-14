@@ -1,9 +1,10 @@
 package types
 
 import (
-	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazygit/pkg/config"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/patch_exploring"
+	"github.com/jesseduffield/lazygit/pkg/i18n"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/sasha-s/go-deadlock"
 )
@@ -88,16 +89,23 @@ type IBaseContext interface {
 
 	AddKeybindingsFn(KeybindingsFn)
 	AddMouseKeybindingsFn(MouseKeybindingsFn)
-	ClearAllBindingsFn()
+	ClearAllAttachedControllerFunctions()
 
-	// This is a bit of a hack at the moment: we currently only set an onclick function so that
-	// our list controller can come along and wrap it in a list-specific click handler.
+	// This is a bit of a hack at the moment: we currently only set an onDoubleClick function so
+	// that the generic ListController can be specialized by view-specific controllers.
 	// We'll need to think of a better way to do this.
-	AddOnClickFn(func() error)
+	AddOnDoubleClickFn(func() error)
+	// Likewise for the focused main view: we need this to communicate between a
+	// side panel controller and the focused main view controller.
+	AddOnClickFocusedMainViewFn(func(mainViewName string, clickedLineIdx int) error)
+	// Adding on to the above, this is so that a list-specific handler can register
+	// a hook for doing additional click handling
+	AddOnClickFn(func(opts gocui.ViewMouseBindingOpts) error)
 
 	AddOnRenderToMainFn(func())
 	AddOnFocusFn(func(OnFocusOpts))
 	AddOnFocusLostFn(func(OnFocusLostOpts))
+	AddOnQuitFn(func())
 }
 
 type Context interface {
@@ -105,6 +113,8 @@ type Context interface {
 
 	HandleFocus(opts OnFocusOpts)
 	HandleFocusLost(opts OnFocusLostOpts)
+	HandleQuit()
+	FocusLine(scrollIntoView bool)
 	HandleRender()
 	HandleRenderToMain()
 }
@@ -126,6 +136,7 @@ type IFilterableContext interface {
 	ReApplyFilter(bool)
 	IsFiltering() bool
 	IsFilterableContext()
+	FilterPrefix(tr *i18n.TranslationSet) string
 }
 
 type ISearchableContext interface {
@@ -142,6 +153,7 @@ type ISearchableContext interface {
 
 	// This must be implemented by each concrete context. Return nil if not searching the model.
 	ModelSearchResults(searchStr string, caseSensitive bool) []gocui.SearchPosition
+	OnSearchSelect(selectedLineIdx int)
 }
 
 type DiffableContext interface {
@@ -152,6 +164,14 @@ type DiffableContext interface {
 	// which becomes an option when you bring up the diff menu, but when you're just
 	// flicking through branches it will be using the local branch name.
 	GetDiffTerminals() []string
+
+	// Returns the ref that should be used for creating a diff of what's
+	// currently shown in the main view against the working directory, in order
+	// to adjust line numbers in the diff to match the current state of the
+	// shown file. For example, if the main view shows a range diff of commits,
+	// we need to pass the first commit of the range. This is used by
+	// DiffHelper.AdjustLineNumber.
+	RefForAdjustingLineNumberInDiff() string
 }
 
 type IListContext interface {
@@ -165,10 +185,12 @@ type IListContext interface {
 	ViewIndexToModelIndex(int) int
 	ModelIndexToViewIndex(int) int
 
-	FocusLine()
 	IsListContext() // used for type switch
 	RangeSelectEnabled() bool
 	RenderOnlyVisibleLines() bool
+	SetNeedRerenderVisibleLines()
+
+	IndexForGotoBottom() int
 }
 
 type IPatchExplorerContext interface {
@@ -177,22 +199,20 @@ type IPatchExplorerContext interface {
 	GetState() *patch_exploring.State
 	SetState(*patch_exploring.State)
 	GetIncludedLineIndices() []int
-	RenderAndFocus(isFocused bool)
-	Render(isFocused bool)
-	Focus()
-	GetContentToRender(isFocused bool) string
-	NavigateTo(isFocused bool, selectedLineIdx int)
+	RenderAndFocus()
+	Render()
+	GetContentToRender() string
+	NavigateTo(selectedLineIdx int)
 	GetMutex() *deadlock.Mutex
 	IsPatchExplorerContext() // used for type switch
 }
 
 type IViewTrait interface {
-	FocusPoint(yIdx int)
+	FocusPoint(yIdx int, scrollIntoView bool)
 	SetRangeSelectStart(yIdx int)
 	CancelRangeSelect()
 	SetViewPortContent(content string)
-	SetViewPortContentAndClearEverythingElse(content string)
-	SetContentLineCount(lineCount int)
+	SetViewPortContentAndClearEverythingElse(lineCount int, content string)
 	SetContent(content string)
 	SetFooter(value string)
 	SetOriginX(value int)
@@ -207,8 +227,9 @@ type IViewTrait interface {
 }
 
 type OnFocusOpts struct {
-	ClickedWindowName  string
-	ClickedViewLineIdx int
+	ClickedWindowName       string
+	ClickedViewLineIdx      int
+	ScrollSelectionIntoView bool
 }
 
 type OnFocusLostOpts struct {
@@ -218,7 +239,7 @@ type OnFocusLostOpts struct {
 type ContextKey string
 
 type KeybindingsOpts struct {
-	GetKey func(key string) Key
+	GetKey func(key string) gocui.Key
 	Config config.KeybindingConfig
 	Guards KeybindingGuards
 }
@@ -231,15 +252,33 @@ type (
 type HasKeybindings interface {
 	GetKeybindings(opts KeybindingsOpts) []*Binding
 	GetMouseKeybindings(opts KeybindingsOpts) []*gocui.ViewMouseBinding
-	GetOnClick() func() error
-	GetOnRenderToMain() func()
-	GetOnFocus() func(OnFocusOpts)
-	GetOnFocusLost() func(OnFocusLostOpts)
+
+	// Implement this to get called when there's a double-click on the view. Only supported by list
+	// views currently. Will be called after the double-clicked list entry has been selected.
+	GetOnDoubleClick() func() error
+
+	// Implement this to get called for any non-double-click in the view. Only supported by list
+	// views currently. Will be called after the clicked list entry has been selected, and
+	// HandleFocus has already been called (so the main view is up to date). Should return nil if it
+	// decides not to do anything with the click.
+	GetOnClick() func(opts gocui.ViewMouseBindingOpts) error
+
+	// Implement this in a side-panel controller to get called when there's a click in the main view
+	// that belongs to your panel while the main view is already focused.
+	GetOnClickFocusedMainView() func(mainViewName string, clickedLineIdx int) error
 }
 
 type IController interface {
 	HasKeybindings
 	Context() Context
+
+	GetOnRenderToMain() func()
+	GetOnFocus() func(OnFocusOpts)
+	GetOnFocusLost() func(OnFocusLostOpts)
+
+	// Implement this to get called when the app quits, and the controller's context has the focus.
+	// Useful for saving state on quit.
+	GetOnQuit() func()
 }
 
 type IList interface {
@@ -278,7 +317,7 @@ type ListItem interface {
 }
 
 type IContextMgr interface {
-	Push(context Context, opts ...OnFocusOpts)
+	Push(context Context, opts OnFocusOpts)
 	Pop()
 	Replace(context Context)
 	Activate(context Context, opts OnFocusOpts)
@@ -286,6 +325,7 @@ type IContextMgr interface {
 	CurrentStatic() Context
 	CurrentSide() Context
 	CurrentPopup() []Context
+	NextInStack(context Context) Context
 	IsCurrent(c Context) bool
 	IsCurrentOrParent(c Context) bool
 	ForEach(func(Context))

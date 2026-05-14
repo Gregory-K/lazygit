@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 package tail
 
 import (
@@ -58,6 +55,9 @@ func tailFrom(lastOffset int64, logFilePath string, opts *humanlog.HandlerOption
 		lines = append(lines, fileScanner.Text())
 	}
 	file.Close()
+	if err := fileScanner.Err(); err != nil {
+		return err
+	}
 	lineCount := len(lines)
 	lastTen := lines
 	if lineCount > 10 {

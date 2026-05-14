@@ -19,7 +19,7 @@ const (
 	// which is good to test for.
 	PWD = "PWD"
 
-	// We set $HOME and $GIT_CONFIG_NOGLOBAL during integrationt tests so
+	// We set $HOME and $GIT_CONFIG_NOGLOBAL during integration tests so
 	// that older versions of git that don't respect $GIT_CONFIG_GLOBAL
 	// will find the correct global config file for testing
 	HOME                = "HOME"
@@ -60,6 +60,11 @@ func NewTestEnvironment(rootDir string) []string {
 	// $GIT_CONFIG_GLOBAL controls global git config location for git
 	// versions >= 2.32.0
 	env = append(env, fmt.Sprintf("%s=%s", GIT_CONFIG_GLOBAL_ENV_VAR, globalGitConfigPath(rootDir)))
+
+	// Disable gh telemetry. It was enabled by default in gh 2.91.0, and
+	// this would cause gh config files to be left in the working tree
+	// (e.g. `test/.local/state/gh/device-id`).
+	env = append(env, "GH_TELEMETRY=disabled")
 
 	return env
 }

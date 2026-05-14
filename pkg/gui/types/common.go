@@ -1,14 +1,14 @@
 package types
 
 import (
-	"github.com/jesseduffield/gocui"
 	"github.com/jesseduffield/lazygit/pkg/commands"
 	"github.com/jesseduffield/lazygit/pkg/commands/git_commands"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/commands/oscommands"
-	"github.com/jesseduffield/lazygit/pkg/commands/types/enums"
 	"github.com/jesseduffield/lazygit/pkg/common"
 	"github.com/jesseduffield/lazygit/pkg/config"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
+	"github.com/jesseduffield/lazygit/pkg/tasks"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/sasha-s/go-deadlock"
 	"gopkg.in/ozeidan/fuzzy-patricia.v3/patricia"
@@ -29,11 +29,11 @@ type IGuiCommon interface {
 	LogAction(action string)
 	LogCommand(cmdStr string, isCommandLine bool)
 	// we call this when we want to refetch some models and render the result. Internally calls PostRefreshUpdate
-	Refresh(RefreshOptions) error
+	Refresh(RefreshOptions)
 	// we call this when we've changed something in the view model but not the actual model,
 	// e.g. expanding or collapsing a folder in a file view. Calling 'Refresh' in this
 	// case would be overkill, although refresh will internally call 'PostRefreshUpdate'
-	PostRefreshUpdate(Context) error
+	PostRefreshUpdate(Context)
 
 	// renders string to a view without resetting its origin
 	SetViewContent(view *gocui.View, content string)
@@ -49,9 +49,15 @@ type IGuiCommon interface {
 	// used purely for the sake of RenderToMainViews to provide the pair of main views we want to render to
 	MainViewPairs() MainViewPairs
 
+	// return the view buffer manager for the given view, or nil if it doesn't have one
+	GetViewBufferManagerForView(view *gocui.View) *tasks.ViewBufferManager
+
 	// returns true if command completed successfully
-	RunSubprocess(cmdObj oscommands.ICmdObj) (bool, error)
-	RunSubprocessAndRefresh(oscommands.ICmdObj) error
+	RunSubprocess(cmdObj *oscommands.CmdObj) (bool, error)
+	RunSubprocessAndRefresh(*oscommands.CmdObj) error
+
+	Suspend() error
+	Resume() error
 
 	Context() IContextMgr
 	ContextForKey(key ContextKey) Context
@@ -65,6 +71,10 @@ type IGuiCommon interface {
 	// Only necessary to call if you're not already on the UI thread i.e. you're inside a goroutine.
 	// All controller handlers are executed on the UI thread.
 	OnUIThread(f func() error)
+	// Like OnUIThread, but signals that the callback only modifies view
+	// content (e.g. spinner), allows the event loop to skip
+	// the expensive layout recalculation when only content changed.
+	OnUIThreadContentOnly(f func() error)
 	// Runs a function in a goroutine. Use this whenever you want to run a goroutine and keep track of the fact
 	// that lazygit is still busy. See docs/dev/Busy.md
 	OnWorker(f func(gocui.Task) error)
@@ -91,7 +101,7 @@ type IGuiCommon interface {
 
 	Modes() *Modes
 
-	Mutexes() Mutexes
+	Mutexes() *Mutexes
 
 	State() IStateAccessor
 
@@ -123,6 +133,8 @@ type IPopupHandler interface {
 	Alert(title string, message string)
 	// Shows a popup asking the user for confirmation.
 	Confirm(opts ConfirmOpts)
+	// Shows a popup asking the user for confirmation if condition is true; otherwise, the HandleConfirm function is called directly.
+	ConfirmIf(condition bool, opts ConfirmOpts) error
 	// Shows a popup prompting the user for input.
 	Prompt(opts PromptOpts)
 	WithWaitingStatus(message string, f func(gocui.Task) error) error
@@ -142,11 +154,14 @@ const (
 )
 
 type CreateMenuOptions struct {
-	Title           string
-	Prompt          string // a message that will be displayed above the menu options
-	Items           []*MenuItem
-	HideCancel      bool
-	ColumnAlignment []utils.Alignment
+	Title                      string
+	Prompt                     string // a message that will be displayed above the menu options
+	Items                      []*MenuItem
+	HideCancel                 bool
+	OnCancel                   func() error // called when the menu is dismissed without selecting an item
+	ColumnAlignment            []utils.Alignment
+	AllowFilteringKeybindings  bool
+	KeepConflictingKeybindings bool // if true, the keybindings that match essential bindings such as confirm or return will not be removed from menu items
 }
 
 type CreatePopupPanelOpts struct {
@@ -162,6 +177,8 @@ type CreatePopupPanelOpts struct {
 	FindSuggestionsFunc func(string) []*Suggestion
 	Mask                bool
 	AllowEditSuggestion bool
+	AllowEmptyInput     bool
+	PreserveWhitespace  bool
 }
 
 type ConfirmOpts struct {
@@ -180,6 +197,8 @@ type PromptOpts struct {
 	FindSuggestionsFunc func(string) []*Suggestion
 	HandleConfirm       func(string) error
 	AllowEditSuggestion bool
+	AllowEmptyInput     bool
+	PreserveWhitespace  bool
 	// CAPTURE THIS
 	HandleClose            func() error
 	HandleDeleteSuggestion func(int) error
@@ -199,6 +218,10 @@ type DisabledReason struct {
 	// error panel instead. This is useful if the text is very long, or if it is
 	// important enough to show it more prominently, or both.
 	ShowErrorInPanel bool
+
+	// If true, the keybinding dispatch mechanism will continue to look for
+	// other handlers for the keypress.
+	AllowFurtherDispatching bool
 }
 
 type MenuWidget int
@@ -238,7 +261,7 @@ type MenuItem struct {
 
 	// If Key is defined it allows the user to press the key to invoke the menu
 	// item, as opposed to having to navigate to it
-	Key Key
+	Key gocui.Key
 
 	// A widget to show in front of the menu item. Supported widget types are
 	// checkboxes and radio buttons,
@@ -269,26 +292,29 @@ func (self *MenuItem) ID() string {
 }
 
 type Model struct {
-	CommitFiles  []*models.CommitFile
-	Files        []*models.File
-	Submodules   []*models.SubmoduleConfig
-	Branches     []*models.Branch
-	Commits      []*models.Commit
-	StashEntries []*models.StashEntry
-	SubCommits   []*models.Commit
-	Remotes      []*models.Remote
-	Worktrees    []*models.Worktree
+	CommitFiles     []*models.CommitFile
+	Files           []*models.File
+	Submodules      []*models.SubmoduleConfig
+	Branches        []*models.Branch
+	Commits         []*models.Commit
+	StashEntries    []*models.StashEntry
+	SubCommits      []*models.Commit
+	Remotes         []*models.Remote
+	Worktrees       []*models.Worktree
+	PullRequests    []*models.GithubPullRequest
+	PullRequestsMap map[string]*models.GithubPullRequest
 
 	// FilteredReflogCommits are the ones that appear in the reflog panel.
-	// when in filtering mode we only include the ones that match the given path
+	// When in filtering mode we only include the ones that match the given path
 	FilteredReflogCommits []*models.Commit
-	// ReflogCommits are the ones used by the branches panel to obtain recency values
-	// if we're not in filtering mode, CommitFiles and FilteredReflogCommits will be
+	// ReflogCommits are the ones used by the branches panel to obtain recency values,
+	// and for the undo functionality.
+	// If we're not in filtering mode, CommitFiles and FilteredReflogCommits will be
 	// one and the same
 	ReflogCommits []*models.Commit
 
 	BisectInfo                          *git_commands.BisectInfo
-	WorkingTreeStateAtLastCommitRefresh enums.RebaseMode
+	WorkingTreeStateAtLastCommitRefresh models.WorkingTreeState
 	RemoteBranches                      []*models.RemoteBranch
 	Tags                                []*models.Tag
 
@@ -302,20 +328,21 @@ type Model struct {
 	FilesTrie *patricia.Trie
 
 	Authors map[string]*models.Author
+
+	HashPool *utils.StringPool
 }
 
-// if you add a new mutex here be sure to instantiate it. We're using pointers to
-// mutexes so that we can pass the mutexes to controllers.
 type Mutexes struct {
-	RefreshingFilesMutex    *deadlock.Mutex
-	RefreshingBranchesMutex *deadlock.Mutex
-	RefreshingStatusMutex   *deadlock.Mutex
-	LocalCommitsMutex       *deadlock.Mutex
-	SubCommitsMutex         *deadlock.Mutex
-	AuthorsMutex            *deadlock.Mutex
-	SubprocessMutex         *deadlock.Mutex
-	PopupMutex              *deadlock.Mutex
-	PtyMutex                *deadlock.Mutex
+	RefreshingFilesMutex        deadlock.Mutex
+	RefreshingBranchesMutex     deadlock.Mutex
+	RefreshingStatusMutex       deadlock.Mutex
+	RefreshingPullRequestsMutex deadlock.Mutex
+	LocalCommitsMutex           deadlock.Mutex
+	SubCommitsMutex             deadlock.Mutex
+	AuthorsMutex                deadlock.Mutex
+	SubprocessMutex             deadlock.Mutex
+	PopupMutex                  deadlock.Mutex
+	PtyMutex                    deadlock.Mutex
 }
 
 // A long-running operation associated with an item. For example, we'll show
@@ -341,6 +368,7 @@ type HasUrn interface {
 type IStateAccessor interface {
 	GetRepoPathStack() *utils.StringStack
 	GetRepoState() IRepoStateAccessor
+	GetPagerConfig() *config.PagerConfig
 	// tells us whether we're currently updating lazygit
 	GetUpdating() bool
 	SetUpdating(bool)
@@ -362,8 +390,8 @@ type IRepoStateAccessor interface {
 	SetStartupStage(stage StartupStage)
 	GetCurrentPopupOpts() *CreatePopupPanelOpts
 	SetCurrentPopupOpts(*CreatePopupPanelOpts)
-	GetScreenMode() WindowMaximisation
-	SetScreenMode(WindowMaximisation)
+	GetScreenMode() ScreenMode
+	SetScreenMode(ScreenMode)
 	InSearchPrompt() bool
 	GetSearchState() *SearchState
 	SetSplitMainPanel(bool)
@@ -382,10 +410,10 @@ const (
 // as in panel, not your terminal's window). Sometimes you want a bit more space
 // to see the contents of a panel, and this keeps track of how much maximisation
 // you've set
-type WindowMaximisation int
+type ScreenMode int
 
 const (
-	SCREEN_NORMAL WindowMaximisation = iota
+	SCREEN_NORMAL ScreenMode = iota
 	SCREEN_HALF
 	SCREEN_FULL
 )

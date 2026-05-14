@@ -1,11 +1,9 @@
 package types
 
 import (
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 )
-
-type Key interface{} // FIXME: find out how to get `gocui.Key | rune`
 
 // Binding - a keybinding mapping a key and modifier to a handler. The keypress
 // is only handled if the given view has focus, or handled globally if the view
@@ -13,15 +11,22 @@ type Key interface{} // FIXME: find out how to get `gocui.Key | rune`
 type Binding struct {
 	ViewName    string
 	Handler     func() error
-	Key         Key
-	Modifier    gocui.Modifier
+	Key         gocui.Key
 	Description string
+	// DescriptionFunc is used instead of Description if non-nil, and is useful for dynamic
+	// descriptions that change depending on context. Important: this must not be an expensive call.
+	// Note that you should still provide a generic, non-dynamic description in the Description field,
+	// as this is used in the cheatsheet.
+	DescriptionFunc func() string
 	// If defined, this is used in place of Description when showing the keybinding
 	// in the options view at the bottom left of the screen.
 	ShortDescription string
-	Alternative      string
-	Tag              string // e.g. 'navigation'. Used for grouping things in the cheatsheet
-	OpensMenu        bool
+	// ShortDescriptionFunc is used instead of ShortDescription if non-nil, and is useful for dynamic
+	// descriptions that change depending on context. Important: this must not be an expensive call.
+	ShortDescriptionFunc func() string
+	Alternative          string
+	Tag                  string // e.g. 'navigation'. Used for grouping things in the cheatsheet
+	OpensMenu            bool
 
 	// If true, the keybinding will appear at the bottom of the screen.
 	// Even if set to true, the keybinding will not be displayed if it is currently
@@ -43,8 +48,25 @@ type Binding struct {
 	GetDisabledReason func() *DisabledReason
 }
 
-func (Binding *Binding) IsDisabled() bool {
-	return Binding.GetDisabledReason != nil && Binding.GetDisabledReason() != nil
+func (b *Binding) IsDisabled() bool {
+	return b.GetDisabledReason != nil && b.GetDisabledReason() != nil
+}
+
+func (b *Binding) GetDescription() string {
+	if b.DescriptionFunc != nil {
+		return b.DescriptionFunc()
+	}
+	return b.Description
+}
+
+func (b *Binding) GetShortDescription() string {
+	if b.ShortDescriptionFunc != nil {
+		return b.ShortDescriptionFunc()
+	}
+	if b.ShortDescription != "" {
+		return b.ShortDescription
+	}
+	return b.GetDescription()
 }
 
 // A guard is a decorator which checks something before executing a handler
@@ -54,4 +76,16 @@ type Guard func(func() error) func() error
 type KeybindingGuards struct {
 	OutsideFilterMode Guard
 	NoPopupPanel      Guard
+}
+
+type ErrKeybindingNotHandled struct {
+	DisabledReason *DisabledReason
+}
+
+func (e ErrKeybindingNotHandled) Error() string {
+	return e.DisabledReason.Text
+}
+
+func (e ErrKeybindingNotHandled) Unwrap() error {
+	return gocui.ErrKeybindingNotHandled
 }

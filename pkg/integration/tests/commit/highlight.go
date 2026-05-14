@@ -10,7 +10,7 @@ var Highlight = NewIntegrationTest(NewIntegrationTestArgs{
 	ExtraCmdArgs: []string{},
 	Skip:         false,
 	SetupConfig: func(config *config.AppConfig) {
-		config.GetAppState().GitLogShowGraph = "always"
+		config.GetUserConfig().Git.Log.ShowGraph = "always"
 		config.GetUserConfig().Gui.AuthorColors = map[string]string{
 			"CI": "red",
 		}
@@ -24,14 +24,14 @@ var Highlight = NewIntegrationTest(NewIntegrationTestArgs{
 		highlightedColor := "#ffffff"
 
 		t.Views().Commits().
-			DoesNotContainColoredText(highlightedColor, "◯").
+			DoesNotContainColoredText(highlightedColor, "○").
 			Focus().
-			ContainsColoredText(highlightedColor, "◯")
+			ContainsColoredText(highlightedColor, "○")
 
 		t.Views().Files().
 			Focus()
 
 		t.Views().Commits().
-			DoesNotContainColoredText(highlightedColor, "◯")
+			DoesNotContainColoredText(highlightedColor, "○")
 	},
 })

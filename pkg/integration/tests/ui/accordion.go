@@ -5,7 +5,7 @@ import (
 	. "github.com/jesseduffield/lazygit/pkg/integration/components"
 )
 
-// When in acccordion mode, Lazygit looks like this:
+// When in accordion mode, Lazygit looks like this:
 //
 // ╶─Status─────────────────────────╴┌─Patch──────────────────────────────────────────────────────────┐
 // ╶─Files - Submodules──────0 of 0─╴│commit 6e56dd04b70e548976f7f2928c4d9c359574e2bc                 ▲
@@ -14,7 +14,7 @@ import (
 // │7fe02805 CI commit 12           ▲│                                                                ▼
 // │6e56dd04 CI commit 11           █└────────────────────────────────────────────────────────────────┘
 // │a35c687d CI commit 10           ▼┌─Command log────────────────────────────────────────────────────┐
-// └───────────────────────10 of 20─┘│Random tip: To filter commits by path, press '<c-s>'            │
+// └───────────────────────10 of 20─┘│Random tip: To filter commits by path, press '<ctrl+s>'         │
 // ╶─Stash───────────────────0 of 0─╴└────────────────────────────────────────────────────────────────┘
 //  <pgup>/<pgdown>: Scroll, <esc>: Cancel, q: Quit, ?: Keybindings, 1-Donate Ask Question unversioned
 

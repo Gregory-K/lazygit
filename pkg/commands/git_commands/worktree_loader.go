@@ -67,6 +67,8 @@ func (self *WorktreeLoader) GetWorktrees() ([]*models.Worktree, error) {
 				// we can parallelize the calls to git rev-parse
 				GitDir: "",
 			}
+		} else if strings.HasPrefix(splitLine, "HEAD ") {
+			current.Head = strings.SplitN(splitLine, " ", 2)[1]
 		} else if strings.HasPrefix(splitLine, "branch ") {
 			branch := strings.SplitN(splitLine, " ", 2)[1]
 			current.Branch = strings.TrimPrefix(branch, "refs/heads/")
@@ -82,7 +84,7 @@ func (self *WorktreeLoader) GetWorktrees() ([]*models.Worktree, error) {
 			if worktree.IsPathMissing {
 				return
 			}
-			gitDir, err := callGitRevParseWithDir(self.cmd, self.version, worktree.Path, "--absolute-git-dir")
+			gitDir, err := callGitRevParseWithDir(self.cmd, worktree.Path, "--absolute-git-dir")
 			if err != nil {
 				self.Log.Warnf("Could not find git dir for worktree %s: %v", worktree.Path, err)
 				return

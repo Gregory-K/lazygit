@@ -67,10 +67,17 @@ func NewSuggestionsContext(
 }
 
 func (self *SuggestionsContext) SetSuggestions(suggestions []*types.Suggestion) {
-	self.State.Suggestions = suggestions
-	self.SetSelection(0)
-	self.c.ResetViewOrigin(self.GetView())
-	self.HandleRender()
+	// SetSuggestions is invoked from AsyncHandler (a worker goroutine) when
+	// the prompt input changes, as well as from prepareConfirmationPanel on
+	// the UI thread. Bounce to the UI thread either way so the worker path
+	// keeps flushing once HandleRender stops calling Render() itself.
+	self.c.OnUIThread(func() error {
+		self.State.Suggestions = suggestions
+		self.SetSelection(0)
+		self.c.ResetViewOrigin(self.GetView())
+		self.HandleRender()
+		return nil
+	})
 }
 
 func (self *SuggestionsContext) RefreshSuggestions() {
@@ -79,13 +86,16 @@ func (self *SuggestionsContext) RefreshSuggestions() {
 		if findSuggestionsFn != nil {
 			suggestions := findSuggestionsFn(self.c.GetPromptInput())
 			return func() { self.SetSuggestions(suggestions) }
-		} else {
-			return func() {}
 		}
+		return func() {}
 	})
 }
 
 // There is currently no need to use range-select in the suggestions view so we're disabling it.
 func (self *SuggestionsContext) RangeSelectEnabled() bool {
 	return false
+}
+
+func (self *SuggestionsContext) GetOnDoubleClick() func() error {
+	return self.State.OnConfirm
 }

@@ -8,20 +8,32 @@
 <br>
 <a href="https://www.warp.dev/?utm_source=github&utm_medium=referral&utm_campaign=lazygit_20231023">
   <div>
-    <img src="../assets/warp.png" width="230" alt="Warp">
+    <img src="https://github.com/warpdotdev/brand-assets/blob/main/Github/Sponsor/Warp-Github-LG-02.png?raw=true" width="400" alt="Warp">
   </div>
-  <b>Warp is a modern, Rust-based terminal with AI built in so you and your team can build great software, faster.</b>
+  <b>Warp, the intelligent terminal</b>
+  <br>
+  <b>Available for macOS and Linux</b>
+  <br>
   <div>
     <sup>Visit warp.dev to learn more.</sup>
   </div>
 </a>
 <br>
 <hr>
+<a href="https://tuple.app/lazygit">
+  <div>
+    <img src="../assets/tuple.png" width="400" alt="Tuple">
+  </div>
+  <b>Tuple, the premier screen sharing app for developers on macOS and Windows.</b>
+</a>
+<br>
+<hr>
+<br>
 <a href="https://www.subble.com">
   <div>
-    <img src="https://subble-marketing-portal-media-storage.s3.amazonaws.com/images/subble-black-name-logo.svg" width="230" alt="Subble">
+    <img src="../assets/subble.webp" width="400" alt="Subble">
   </div>
-  <b>I (Jesse) co-founded Subble to save your company time and money by helping you manage its software subscriptions. Check it out!</b>
+  <b>I (Jesse) co-founded Subble to save your company time and money by finding unused and over-provisioned SaaS licences. Check it out!</b>
 </a>
 <br>
 
@@ -37,7 +49,7 @@
 A simple terminal UI for git commands
 <br/>
 
-[![GitHub Releases](https://img.shields.io/github/downloads/jesseduffield/lazygit/total)](https://github.com/jesseduffield/lazygit/releases) [![Go Report Card](https://goreportcard.com/badge/github.com/jesseduffield/lazygit)](https://goreportcard.com/report/github.com/jesseduffield/lazygit) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f46416b715d74622895657935fcada21)](https://app.codacy.com/gh/jesseduffield/lazygit/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/f46416b715d74622895657935fcada21)](https://app.codacy.com/gh/jesseduffield/lazygit/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage) [![GolangCI](https://golangci.com/badges/github.com/jesseduffield/lazygit.svg)](https://golangci.com) [![GitHub tag](https://img.shields.io/github/tag/jesseduffield/lazygit.svg)](https://github.com/jesseduffield/lazygit/releases/latest) [![homebrew](https://img.shields.io/homebrew/v/lazygit)](https://github.com/Homebrew/homebrew-core/blob/master/Formula/lazygit.rb)
+[![GitHub Releases](https://img.shields.io/github/downloads/jesseduffield/lazygit/total)](https://github.com/jesseduffield/lazygit/releases) [![Go Report Card](https://goreportcard.com/badge/github.com/jesseduffield/lazygit)](https://goreportcard.com/report/github.com/jesseduffield/lazygit) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f46416b715d74622895657935fcada21)](https://app.codacy.com/gh/jesseduffield/lazygit/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/f46416b715d74622895657935fcada21)](https://app.codacy.com/gh/jesseduffield/lazygit/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage) [![golangci-lint](https://img.shields.io/badge/linted%20by-golangci--lint-brightgreen)](https://golangci-lint.run/) [![GitHub tag](https://img.shields.io/github/v/tag/jesseduffield/lazygit?color=blue)](https://github.com/jesseduffield/lazygit/releases/latest) [![homebrew](https://img.shields.io/homebrew/v/lazygit?color=blue)](https://formulae.brew.sh/formula/lazygit)
 
 ![commit_and_push](../assets/demo/commit_and_push-compressed.gif)
 
@@ -50,7 +62,7 @@ A simple terminal UI for git commands
 </p>
 
 <p align="center">
-<!-- sponsors --><a href="https://github.com/intabulas"><img src="https://github.com/intabulas.png" width="60px" alt="Mark Lussier" /></a><a href="https://github.com/peppy"><img src="https://github.com/peppy.png" width="60px" alt="Dean Herbert" /></a><a href="https://github.com/piot"><img src="https://github.com/piot.png" width="60px" alt="Peter Bjorklund" /></a><a href="https://github.com/rgwood"><img src="https://github.com/rgwood.png" width="60px" alt="Reilly Wood" /></a><a href="https://github.com/oliverguenther"><img src="https://github.com/oliverguenther.png" width="60px" alt="Oliver Günther" /></a><a href="https://github.com/pawanjay176"><img src="https://github.com/pawanjay176.png" width="60px" alt="Pawan Dhananjay" /></a><a href="https://github.com/bdach"><img src="https://github.com/bdach.png" width="60px" alt="Bartłomiej Dach" /></a><a href="https://github.com/carstengehling"><img src="https://github.com/carstengehling.png" width="60px" alt="Carsten Gehling" /></a><a href="https://github.com/ceuk"><img src="https://github.com/ceuk.png" width="60px" alt="CEUK" /></a><a href="https://github.com/akospwc"><img src="https://github.com/akospwc.png" width="60px" alt="Akos Putz" /></a><a href="https://github.com/Xetera"><img src="https://github.com/Xetera.png" width="60px" alt="" /></a><a href="https://github.com/HoldenLucas"><img src="https://github.com/HoldenLucas.png" width="60px" alt="Holden Lucas" /></a><a href="https://github.com/nartc"><img src="https://github.com/nartc.png" width="60px" alt="Chau Tran" /></a><a href="https://github.com/matejcik"><img src="https://github.com/matejcik.png" width="60px" alt="matejcik" /></a><a href="https://github.com/lucatume"><img src="https://github.com/lucatume.png" width="60px" alt="theAverageDev (Luca Tumedei)" /></a><a href="https://github.com/IvanZuy"><img src="https://github.com/IvanZuy.png" width="60px" alt="Ivan Zaitsev" /></a><a href="https://github.com/nicholascloud"><img src="https://github.com/nicholascloud.png" width="60px" alt="Nicholas Cloud" /></a><a href="https://github.com/PhotonQuantum"><img src="https://github.com/PhotonQuantum.png" width="60px" alt="LightQuantum" /></a><a href="https://github.com/GitSquared"><img src="https://github.com/GitSquared.png" width="60px" alt="Gabriel Saillard" /></a><a href="https://github.com/ava1ar"><img src="https://github.com/ava1ar.png" width="60px" alt="Aliaksandr Stelmachonak" /></a><a href="https://github.com/minidfx"><img src="https://github.com/minidfx.png" width="60px" alt="Burgy Benjamin" /></a><a href="https://github.com/JoeKlemmer"><img src="https://github.com/JoeKlemmer.png" width="60px" alt="Joe Klemmer" /></a><a href="https://github.com/tobi"><img src="https://github.com/tobi.png" width="60px" alt="Tobias Lütke" /></a><a href="https://github.com/benbfortis"><img src="https://github.com/benbfortis.png" width="60px" alt="Ben Beaumont" /></a><a href="https://github.com/jakewarren"><img src="https://github.com/jakewarren.png" width="60px" alt="" /></a><a href="https://github.com/tgpholly"><img src="https://github.com/tgpholly.png" width="60px" alt="Holly" /></a><a href="https://github.com/bitprophet"><img src="https://github.com/bitprophet.png" width="60px" alt="Jeff Forcier" /></a><a href="https://github.com/tayleighr"><img src="https://github.com/tayleighr.png" width="60px" alt="" /></a><a href="https://github.com/Novakov"><img src="https://github.com/Novakov.png" width="60px" alt="Maciej T. Nowak" /></a><a href="https://github.com/farzadmf"><img src="https://github.com/farzadmf.png" width="60px" alt="Farzad Majidfayyaz" /></a><a href="https://github.com/nekhaevskiy"><img src="https://github.com/nekhaevskiy.png" width="60px" alt="Yury" /></a><a href="https://github.com/reivilibre"><img src="https://github.com/reivilibre.png" width="60px" alt="" /></a><a href="https://github.com/andreaskurth"><img src="https://github.com/andreaskurth.png" width="60px" alt="Andreas Kurth" /></a><a href="https://github.com/BSteffaniak"><img src="https://github.com/BSteffaniak.png" width="60px" alt="Braden Steffaniak" /></a><a href="https://github.com/jordan-gillard"><img src="https://github.com/jordan-gillard.png" width="60px" alt="Jordan Gillard" /></a><a href="https://github.com/smangels"><img src="https://github.com/smangels.png" width="60px" alt="Sebastian" /></a><a href="https://github.com/George-Spanos"><img src="https://github.com/George-Spanos.png" width="60px" alt="George Spanos" /></a><a href="https://github.com/amslezak"><img src="https://github.com/amslezak.png" width="60px" alt="Andy Slezak" /></a><a href="https://github.com/mkock"><img src="https://github.com/mkock.png" width="60px" alt="Martin Kock" /></a><a href="https://github.com/illarionvk"><img src="https://github.com/illarionvk.png" width="60px" alt="Illarion Koperski" /></a><a href="https://github.com/jessealama"><img src="https://github.com/jessealama.png" width="60px" alt="Jesse Alama" /></a><a href="https://github.com/codacy"><img src="https://github.com/codacy.png" width="60px" alt="Codacy" /></a><a href="https://github.com/colbr"><img src="https://github.com/colbr.png" width="60px" alt="Brett" /></a><a href="https://github.com/heijmans"><img src="https://github.com/heijmans.png" width="60px" alt="Jan Heijmans" /></a><a href="https://github.com/Vesther"><img src="https://github.com/Vesther.png" width="60px" alt="Kevin Nowald" /></a><a href="https://github.com/sempruijs"><img src="https://github.com/sempruijs.png" width="60px" alt="sem pruijs" /></a><a href="https://github.com/omarluq"><img src="https://github.com/omarluq.png" width="60px" alt="Omar Luq " /></a><a href="https://github.com/arcanemachine"><img src="https://github.com/arcanemachine.png" width="60px" alt="Nicholas Moen" /></a><a href="https://github.com/ethanjli"><img src="https://github.com/ethanjli.png" width="60px" alt="Ethan Li" /></a><a href="https://github.com/phubaba"><img src="https://github.com/phubaba.png" width="60px" alt="" /></a><a href="https://github.com/fomrat"><img src="https://github.com/fomrat.png" width="60px" alt="Brian MacAskill" /></a><a href="https://github.com/canhazcodez"><img src="https://github.com/canhazcodez.png" width="60px" alt="Maxi" /></a><a href="https://github.com/nikbrunner"><img src="https://github.com/nikbrunner.png" width="60px" alt="nbr" /></a><a href="https://github.com/mikybars"><img src="https://github.com/mikybars.png" width="60px" alt="Miguel Ibars" /></a><a href="https://github.com/neunkasulle"><img src="https://github.com/neunkasulle.png" width="60px" alt="Jan Zenkner" /></a><a href="https://github.com/ahkohd"><img src="https://github.com/ahkohd.png" width="60px" alt="Victor Aremu" /></a><a href="https://github.com/RVxLab"><img src="https://github.com/RVxLab.png" width="60px" alt="" /></a><a href="https://github.com/igor-ramazanov"><img src="https://github.com/igor-ramazanov.png" width="60px" alt="Igor Ramazanov" /></a><a href="https://github.com/glotchimo"><img src="https://github.com/glotchimo.png" width="60px" alt="Elliott Maguire" /></a><a href="https://github.com/n8nio"><img src="https://github.com/n8nio.png" width="60px" alt="n8n - Workflow Automation" /></a><a href="https://github.com/joshuadavidthomas"><img src="https://github.com/joshuadavidthomas.png" width="60px" alt="Josh Thomas" /></a><a href="https://github.com/josephjacks"><img src="https://github.com/josephjacks.png" width="60px" alt="JJ" /></a><a href="https://github.com/FrederickGeek8"><img src="https://github.com/FrederickGeek8.png" width="60px" alt="Frederick Morlock" /></a><a href="https://github.com/agrippanux"><img src="https://github.com/agrippanux.png" width="60px" alt="Darren Craine" /></a><a href="https://github.com/ezdac"><img src="https://github.com/ezdac.png" width="60px" alt="Maximilian Langenfeld" /></a><a href="https://github.com/sarzhann"><img src="https://github.com/sarzhann.png" width="60px" alt="Nurzhan" /></a><a href="https://github.com/dbuls"><img src="https://github.com/dbuls.png" width="60px" alt="Davis Buls" /></a><a href="https://github.com/lppassos"><img src="https://github.com/lppassos.png" width="60px" alt="" /></a><a href="https://github.com/chrisolsen"><img src="https://github.com/chrisolsen.png" width="60px" alt="Chris Olsen" /></a><a href="https://github.com/neilcode"><img src="https://github.com/neilcode.png" width="60px" alt="Neil Lambert" /></a><a href="https://github.com/dhh"><img src="https://github.com/dhh.png" width="60px" alt="David Heinemeier Hansson" /></a><a href="https://github.com/mmv08"><img src="https://github.com/mmv08.png" width="60px" alt="Mikhail" /></a><a href="https://github.com/macmiranda"><img src="https://github.com/macmiranda.png" width="60px" alt="Marco Aurelio Caldas Miranda" /></a><a href="https://github.com/osarogie"><img src="https://github.com/osarogie.png" width="60px" alt="Emmanuel Nosakhare" /></a><a href="https://github.com/ethanfischer"><img src="https://github.com/ethanfischer.png" width="60px" alt="Ethan Fischer" /></a><a href="https://github.com/poshboytl"><img src="https://github.com/poshboytl.png" width="60px" alt="Terry Tai" /></a><a href="https://github.com/a-jentleman"><img src="https://github.com/a-jentleman.png" width="60px" alt="" /></a><a href="https://github.com/roesnera"><img src="https://github.com/roesnera.png" width="60px" alt="Adam Roesner" /></a><a href="https://github.com/herdingdata"><img src="https://github.com/herdingdata.png" width="60px" alt="Andy Herd" /></a><a href="https://github.com/wassimk"><img src="https://github.com/wassimk.png" width="60px" alt="Wassim Metallaoui" /></a><a href="https://github.com/tornikegomareli"><img src="https://github.com/tornikegomareli.png" width="60px" alt="Tornike Gomareli" /></a><a href="https://github.com/seven1m"><img src="https://github.com/seven1m.png" width="60px" alt="Tim Morgan" /></a><a href="https://github.com/sgoridotla1"><img src="https://github.com/sgoridotla1.png" width="60px" alt="Max Shypulniak" /></a><a href="https://github.com/meshanator"><img src="https://github.com/meshanator.png" width="60px" alt="Meshan Naidoo" /></a><a href="https://github.com/kyu08"><img src="https://github.com/kyu08.png" width="60px" alt="kyu08" /></a><a href="https://github.com/piacsek"><img src="https://github.com/piacsek.png" width="60px" alt="Felipe Piacsek" /></a><a href="https://github.com/dimaunx"><img src="https://github.com/dimaunx.png" width="60px" alt="dimaunx" /></a><a href="https://github.com/ADIX7"><img src="https://github.com/ADIX7.png" width="60px" alt="Kovács Ádám" /></a><a href="https://github.com/MatthewYe"><img src="https://github.com/MatthewYe.png" width="60px" alt="叶博" /></a><a href="https://github.com/DusanLesan"><img src="https://github.com/DusanLesan.png" width="60px" alt="Dusan Lesan" /></a><a href="https://github.com/iantanwx"><img src="https://github.com/iantanwx.png" width="60px" alt="Ian Tan" /></a><a href="https://github.com/maulik13"><img src="https://github.com/maulik13.png" width="60px" alt="Maulik Kataria" /></a><a href="https://github.com/ChanhLy"><img src="https://github.com/ChanhLy.png" width="60px" alt="ChanhLy" /></a><a href="https://github.com/enzosterro"><img src="https://github.com/enzosterro.png" width="60px" alt="Enzo Sterro" /></a><a href="https://github.com/tfeldmann"><img src="https://github.com/tfeldmann.png" width="60px" alt="Thomas Feldmann" /></a><!-- sponsors -->
+<!-- sponsors --><a href="https://github.com/intabulas"><img src="https:&#x2F;&#x2F;github.com&#x2F;intabulas.png" width="60px" alt="User avatar: Mark Lussier" /></a><a href="https://github.com/peppy"><img src="https:&#x2F;&#x2F;github.com&#x2F;peppy.png" width="60px" alt="User avatar: Dean Herbert" /></a><a href="https://github.com/piot"><img src="https:&#x2F;&#x2F;github.com&#x2F;piot.png" width="60px" alt="User avatar: Peter Bjorklund" /></a><a href="https://github.com/oliverguenther"><img src="https:&#x2F;&#x2F;github.com&#x2F;oliverguenther.png" width="60px" alt="User avatar: Oliver Günther" /></a><a href="https://github.com/pawanjay176"><img src="https:&#x2F;&#x2F;github.com&#x2F;pawanjay176.png" width="60px" alt="User avatar: Pawan Dhananjay" /></a><a href="https://github.com/naoey"><img src="https:&#x2F;&#x2F;github.com&#x2F;naoey.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/carstengehling"><img src="https:&#x2F;&#x2F;github.com&#x2F;carstengehling.png" width="60px" alt="User avatar: Carsten Gehling" /></a><a href="https://github.com/Xetera"><img src="https:&#x2F;&#x2F;github.com&#x2F;Xetera.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/nartc"><img src="https:&#x2F;&#x2F;github.com&#x2F;nartc.png" width="60px" alt="User avatar: Chau Tran" /></a><a href="https://github.com/matejcik"><img src="https:&#x2F;&#x2F;github.com&#x2F;matejcik.png" width="60px" alt="User avatar: matejcik" /></a><a href="https://github.com/lucatume"><img src="https:&#x2F;&#x2F;github.com&#x2F;lucatume.png" width="60px" alt="User avatar: theAverageDev (Luca Tumedei)" /></a><a href="https://github.com/IvanZuy"><img src="https:&#x2F;&#x2F;github.com&#x2F;IvanZuy.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/ava1ar"><img src="https:&#x2F;&#x2F;github.com&#x2F;ava1ar.png" width="60px" alt="User avatar: Aliaksandr Stelmachonak" /></a><a href="https://github.com/pedropombeiro"><img src="https:&#x2F;&#x2F;github.com&#x2F;pedropombeiro.png" width="60px" alt="User avatar: Pedro Pombeiro" /></a><a href="https://github.com/bburgy"><img src="https:&#x2F;&#x2F;github.com&#x2F;bburgy.png" width="60px" alt="User avatar: Burgy Benjamin" /></a><a href="https://github.com/JoeKlemmer"><img src="https:&#x2F;&#x2F;github.com&#x2F;JoeKlemmer.png" width="60px" alt="User avatar: Joe Klemmer" /></a><a href="https://github.com/tobi"><img src="https:&#x2F;&#x2F;github.com&#x2F;tobi.png" width="60px" alt="User avatar: Tobias Lütke" /></a><a href="https://github.com/benbfortis"><img src="https:&#x2F;&#x2F;github.com&#x2F;benbfortis.png" width="60px" alt="User avatar: Ben Beaumont" /></a><a href="https://github.com/jakewarren"><img src="https:&#x2F;&#x2F;github.com&#x2F;jakewarren.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/tgpholly"><img src="https:&#x2F;&#x2F;github.com&#x2F;tgpholly.png" width="60px" alt="User avatar: Holly" /></a><a href="https://github.com/Tommylans"><img src="https:&#x2F;&#x2F;github.com&#x2F;Tommylans.png" width="60px" alt="User avatar: Tom Lanser" /></a><a href="https://github.com/socketbox"><img src="https:&#x2F;&#x2F;github.com&#x2F;socketbox.png" width="60px" alt="User avatar: Casey Boettcher" /></a><a href="https://github.com/bitprophet"><img src="https:&#x2F;&#x2F;github.com&#x2F;bitprophet.png" width="60px" alt="User avatar: Jeff Forcier" /></a><a href="https://github.com/tayleighr"><img src="https:&#x2F;&#x2F;github.com&#x2F;tayleighr.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/Novakov"><img src="https:&#x2F;&#x2F;github.com&#x2F;Novakov.png" width="60px" alt="User avatar: Maciej T. Nowak" /></a><a href="https://github.com/jhillyerd"><img src="https:&#x2F;&#x2F;github.com&#x2F;jhillyerd.png" width="60px" alt="User avatar: James Hillyerd" /></a><a href="https://github.com/nekhaevskiy"><img src="https:&#x2F;&#x2F;github.com&#x2F;nekhaevskiy.png" width="60px" alt="User avatar: Yury" /></a><a href="https://github.com/reivilibre"><img src="https:&#x2F;&#x2F;github.com&#x2F;reivilibre.png" width="60px" alt="User avatar: Olivier reivilibre" /></a><a href="https://github.com/BSteffaniak"><img src="https:&#x2F;&#x2F;github.com&#x2F;BSteffaniak.png" width="60px" alt="User avatar: Braden Steffaniak" /></a><a href="https://github.com/jordan-gillard"><img src="https:&#x2F;&#x2F;github.com&#x2F;jordan-gillard.png" width="60px" alt="User avatar: Jordan Gillard" /></a><a href="https://github.com/smangels"><img src="https:&#x2F;&#x2F;github.com&#x2F;smangels.png" width="60px" alt="User avatar: Sebastian" /></a><a href="https://github.com/amslezak"><img src="https:&#x2F;&#x2F;github.com&#x2F;amslezak.png" width="60px" alt="User avatar: Andy Slezak" /></a><a href="https://github.com/mkock"><img src="https:&#x2F;&#x2F;github.com&#x2F;mkock.png" width="60px" alt="User avatar: Martin Kock" /></a><a href="https://github.com/danielkokott"><img src="https:&#x2F;&#x2F;github.com&#x2F;danielkokott.png" width="60px" alt="User avatar: Daniel Kokott" /></a><a href="https://github.com/heijmans"><img src="https:&#x2F;&#x2F;github.com&#x2F;heijmans.png" width="60px" alt="User avatar: Jan Heijmans" /></a><a href="https://github.com/knowald"><img src="https:&#x2F;&#x2F;github.com&#x2F;knowald.png" width="60px" alt="User avatar: Kevin Nowald" /></a><a href="https://github.com/ethanjli"><img src="https:&#x2F;&#x2F;github.com&#x2F;ethanjli.png" width="60px" alt="User avatar: Ethan Li" /></a><a href="https://github.com/phubaba"><img src="https:&#x2F;&#x2F;github.com&#x2F;phubaba.png" width="60px" alt="User avatar: Robert Forler" /></a><a href="https://github.com/neunkasulle"><img src="https:&#x2F;&#x2F;github.com&#x2F;neunkasulle.png" width="60px" alt="User avatar: Jan Zenkner" /></a><a href="https://github.com/RVxLab"><img src="https:&#x2F;&#x2F;github.com&#x2F;RVxLab.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/FrederickGeek8"><img src="https:&#x2F;&#x2F;github.com&#x2F;FrederickGeek8.png" width="60px" alt="User avatar: Frederick Morlock" /></a><a href="https://github.com/ezdac"><img src="https:&#x2F;&#x2F;github.com&#x2F;ezdac.png" width="60px" alt="User avatar: Maximilian Langenfeld" /></a><a href="https://github.com/lppassos"><img src="https:&#x2F;&#x2F;github.com&#x2F;lppassos.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/neilcode"><img src="https:&#x2F;&#x2F;github.com&#x2F;neilcode.png" width="60px" alt="User avatar: Neil Lambert" /></a><a href="https://github.com/dhh"><img src="https:&#x2F;&#x2F;github.com&#x2F;dhh.png" width="60px" alt="User avatar: David Heinemeier Hansson" /></a><a href="https://github.com/ethanfischer"><img src="https:&#x2F;&#x2F;github.com&#x2F;ethanfischer.png" width="60px" alt="User avatar: Ethan Fischer" /></a><a href="https://github.com/poshboytl"><img src="https:&#x2F;&#x2F;github.com&#x2F;poshboytl.png" width="60px" alt="User avatar: Terry Tai" /></a><a href="https://github.com/roesnera"><img src="https:&#x2F;&#x2F;github.com&#x2F;roesnera.png" width="60px" alt="User avatar: Adam Roesner" /></a><a href="https://github.com/seven1m"><img src="https:&#x2F;&#x2F;github.com&#x2F;seven1m.png" width="60px" alt="User avatar: Tim Morgan" /></a><a href="https://github.com/sgoridotla1"><img src="https:&#x2F;&#x2F;github.com&#x2F;sgoridotla1.png" width="60px" alt="User avatar: Maksym Shypulniak" /></a><a href="https://github.com/ADIX7"><img src="https:&#x2F;&#x2F;github.com&#x2F;ADIX7.png" width="60px" alt="User avatar: Kovács Ádám" /></a><a href="https://github.com/slowdub"><img src="https:&#x2F;&#x2F;github.com&#x2F;slowdub.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/serranomorante"><img src="https:&#x2F;&#x2F;github.com&#x2F;serranomorante.png" width="60px" alt="User avatar: Patricio Serrano" /></a><a href="https://github.com/kiriDevs"><img src="https:&#x2F;&#x2F;github.com&#x2F;kiriDevs.png" width="60px" alt="User avatar: Kiri" /></a><a href="https://github.com/StevenMasini"><img src="https:&#x2F;&#x2F;github.com&#x2F;StevenMasini.png" width="60px" alt="User avatar: Steven Masini" /></a><a href="https://github.com/bjornevik"><img src="https:&#x2F;&#x2F;github.com&#x2F;bjornevik.png" width="60px" alt="User avatar: John Even Bjørnevik" /></a><a href="https://github.com/moberst"><img src="https:&#x2F;&#x2F;github.com&#x2F;moberst.png" width="60px" alt="User avatar: Michael Oberst" /></a><a href="https://github.com/adam-e-trepanier"><img src="https:&#x2F;&#x2F;github.com&#x2F;adam-e-trepanier.png" width="60px" alt="User avatar: Adam Trepanier" /></a><a href="https://github.com/arkalon76"><img src="https:&#x2F;&#x2F;github.com&#x2F;arkalon76.png" width="60px" alt="User avatar: Kenth Fagerlund" /></a><a href="https://github.com/Djuuu"><img src="https:&#x2F;&#x2F;github.com&#x2F;Djuuu.png" width="60px" alt="User avatar: Julien Tardot" /></a><a href="https://github.com/ellord"><img src="https:&#x2F;&#x2F;github.com&#x2F;ellord.png" width="60px" alt="User avatar: Ellord Tayag" /></a><a href="https://github.com/EdgarPost"><img src="https:&#x2F;&#x2F;github.com&#x2F;EdgarPost.png" width="60px" alt="User avatar: Edgar Post-Buijs" /></a><a href="https://github.com/caillou"><img src="https:&#x2F;&#x2F;github.com&#x2F;caillou.png" width="60px" alt="User avatar: Pierre Spring" /></a><a href="https://github.com/mebezac"><img src="https:&#x2F;&#x2F;github.com&#x2F;mebezac.png" width="60px" alt="User avatar: Zac Clay" /></a><a href="https://github.com/Tom94"><img src="https:&#x2F;&#x2F;github.com&#x2F;Tom94.png" width="60px" alt="User avatar: Thomas Müller" /></a><a href="https://github.com/ccssmnn"><img src="https:&#x2F;&#x2F;github.com&#x2F;ccssmnn.png" width="60px" alt="User avatar: Carl Assmann" /></a><a href="https://github.com/ognevsd"><img src="https:&#x2F;&#x2F;github.com&#x2F;ognevsd.png" width="60px" alt="User avatar: Sergey Ognev" /></a><a href="https://github.com/moodyhunter"><img src="https:&#x2F;&#x2F;github.com&#x2F;moodyhunter.png" width="60px" alt="User avatar: Moody Liu" /></a><a href="https://github.com/elithper"><img src="https:&#x2F;&#x2F;github.com&#x2F;elithper.png" width="60px" alt="User avatar: Michael Howard" /></a><a href="https://github.com/LasseBloch"><img src="https:&#x2F;&#x2F;github.com&#x2F;LasseBloch.png" width="60px" alt="User avatar: Lasse Bloch Lauritsen" /></a><a href="https://github.com/dbrockman"><img src="https:&#x2F;&#x2F;github.com&#x2F;dbrockman.png" width="60px" alt="User avatar: David Brockman" /></a><a href="https://github.com/slavshik"><img src="https:&#x2F;&#x2F;github.com&#x2F;slavshik.png" width="60px" alt="User avatar: Alexander Slavschik" /></a><a href="https://github.com/aidalgol"><img src="https:&#x2F;&#x2F;github.com&#x2F;aidalgol.png" width="60px" alt="User avatar: Aidan Gauland" /></a><a href="https://github.com/mbienkowsk"><img src="https:&#x2F;&#x2F;github.com&#x2F;mbienkowsk.png" width="60px" alt="User avatar: Maksym Bieńkowski" /></a><a href="https://github.com/joshuawootonn"><img src="https:&#x2F;&#x2F;github.com&#x2F;joshuawootonn.png" width="60px" alt="User avatar: Joshua Wootonn" /></a><a href="https://github.com/I4nJ"><img src="https:&#x2F;&#x2F;github.com&#x2F;I4nJ.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/sandviklee"><img src="https:&#x2F;&#x2F;github.com&#x2F;sandviklee.png" width="60px" alt="User avatar: Simon Sandvik Lee" /></a><a href="https://github.com/glagnar"><img src="https:&#x2F;&#x2F;github.com&#x2F;glagnar.png" width="60px" alt="User avatar: Thomas Gilbert" /></a><a href="https://github.com/skrzepto"><img src="https:&#x2F;&#x2F;github.com&#x2F;skrzepto.png" width="60px" alt="User avatar: Szymon Mucha" /></a><a href="https://github.com/unnawut"><img src="https:&#x2F;&#x2F;github.com&#x2F;unnawut.png" width="60px" alt="User avatar: Unnawut Leepaisalsuwanna" /></a><a href="https://github.com/wortmanb"><img src="https:&#x2F;&#x2F;github.com&#x2F;wortmanb.png" width="60px" alt="User avatar: Bret Wortman" /></a><a href="https://github.com/simoncdna"><img src="https:&#x2F;&#x2F;github.com&#x2F;simoncdna.png" width="60px" alt="User avatar: Simon Cardona" /></a><a href="https://github.com/andre-lameirinhas"><img src="https:&#x2F;&#x2F;github.com&#x2F;andre-lameirinhas.png" width="60px" alt="User avatar: André Lameirinhas" /></a><a href="https://github.com/SVappsLAB"><img src="https:&#x2F;&#x2F;github.com&#x2F;SVappsLAB.png" width="60px" alt="User avatar: Scott Velez" /></a><a href="https://github.com/ooojustin"><img src="https:&#x2F;&#x2F;github.com&#x2F;ooojustin.png" width="60px" alt="User avatar: justin" /></a><a href="https://github.com/mayfieldiv"><img src="https:&#x2F;&#x2F;github.com&#x2F;mayfieldiv.png" width="60px" alt="User avatar: Mayfield" /></a><a href="https://github.com/somaholiday"><img src="https:&#x2F;&#x2F;github.com&#x2F;somaholiday.png" width="60px" alt="User avatar: Soma Holiday" /></a><a href="https://github.com/bizmythy"><img src="https:&#x2F;&#x2F;github.com&#x2F;bizmythy.png" width="60px" alt="User avatar: bizmyth" /></a><a href="https://github.com/dessalines"><img src="https:&#x2F;&#x2F;github.com&#x2F;dessalines.png" width="60px" alt="User avatar: Dessalines" /></a><a href="https://github.com/KKodiac"><img src="https:&#x2F;&#x2F;github.com&#x2F;KKodiac.png" width="60px" alt="User avatar: Sean Hong(홍성민)" /></a><a href="https://github.com/RADreymann"><img src="https:&#x2F;&#x2F;github.com&#x2F;RADreymann.png" width="60px" alt="User avatar: Alex Dreymann" /></a><a href="https://github.com/felipeospina21"><img src="https:&#x2F;&#x2F;github.com&#x2F;felipeospina21.png" width="60px" alt="User avatar: Felipe Ospina" /></a><a href="https://github.com/riccardoNovaglia"><img src="https:&#x2F;&#x2F;github.com&#x2F;riccardoNovaglia.png" width="60px" alt="User avatar: Riccardo Novaglia" /></a><a href="https://github.com/nitipon-apaisri"><img src="https:&#x2F;&#x2F;github.com&#x2F;nitipon-apaisri.png" width="60px" alt="User avatar: rxz" /></a><a href="https://github.com/rbuchberger"><img src="https:&#x2F;&#x2F;github.com&#x2F;rbuchberger.png" width="60px" alt="User avatar: Robert Buchberger" /></a><a href="https://github.com/tyamori"><img src="https:&#x2F;&#x2F;github.com&#x2F;tyamori.png" width="60px" alt="User avatar: housekeeper" /></a><a href="https://github.com/fogrye"><img src="https:&#x2F;&#x2F;github.com&#x2F;fogrye.png" width="60px" alt="User avatar: Yurii" /></a><a href="https://github.com/paalss"><img src="https:&#x2F;&#x2F;github.com&#x2F;paalss.png" width="60px" alt="User avatar: Pål Syvertsen Stakvik" /></a><a href="https://github.com/SaucePackets"><img src="https:&#x2F;&#x2F;github.com&#x2F;SaucePackets.png" width="60px" alt="User avatar: " /></a><a href="https://github.com/zakelfassi"><img src="https:&#x2F;&#x2F;github.com&#x2F;zakelfassi.png" width="60px" alt="User avatar: Zak El Fassi" /></a><!-- sponsors -->
 </p>
 
 ## Elevator Pitch
@@ -82,16 +94,22 @@ If you're a mere mortal like me and you're tired of hearing how powerful git is 
 - [Tutorials](#tutorials)
 - [Installation](#installation)
   - [Binary Releases](#binary-releases)
+  - [Dev container](#dev-container-feature)
   - [Homebrew](#homebrew)
   - [MacPorts](#macports)
   - [Void Linux](#void-linux)
   - [Scoop (Windows)](#scoop-windows)
+  - [gah (Linux and Mac OS)](#gah-linux-and-mac-os)
   - [Arch Linux](#arch-linux)
-  - [Fedora and RHEL](#fedora-and-rhel)
+  - [Fedora / Amazon Linux 2023 / CentOS Stream](#fedora--amazon-linux-2023--centos-stream)
+    - [Fedora / RHEL Derivatives (Terra)](#fedora--rhel-derivatives-terra)
   - [Solus Linux](#solus-linux)
-  - [Ubuntu](#ubuntu)
+  - [Debian and Ubuntu](#debian-and-ubuntu)
   - [Funtoo Linux](#funtoo-linux)
   - [Gentoo Linux](#gentoo-linux)
+  - [openSUSE](#opensuse)
+  - [NixOS](#nixos)
+  - [Flox](#flox)
   - [FreeBSD](#freebsd)
   - [Termux](#termux)
   - [Conda](#conda)
@@ -127,7 +145,7 @@ Press space on the selected line to stage it, or press `v` to start selecting a 
 
 ### Interactive Rebase
 
-Press `i` to start an interactive rebase. Then squash (`s`), fixup (`f`), drop (`d`), edit (`e`), move up (`ctrl+i`) or move down (`ctrl+j`) any of TODO commits, before continuing the rebase by bringing up the rebase options menu with `m` and then selecting `continue`.
+Press `i` to start an interactive rebase. Then squash (`s`), fixup (`f`), drop (`d`), edit (`e`), move up (`ctrl+k`) or move down (`ctrl+j`) any of TODO commits, before continuing the rebase by bringing up the rebase options menu with `m` and then selecting `continue`.
 
 You can also perform any these actions as a once-off (e.g. pressing `s` on a commit to squash it) without explicitly starting a rebase.
 
@@ -149,7 +167,7 @@ Press `b` in the commits view to mark a commit as good/bad in order to begin a g
 
 ### Nuke the working tree
 
-For when you really want to just get rid of anything that shows up when you run `git status` (and yes that includes dirty submodules) [kidpix style](https://www.youtube.com/watch?v=Ur7_A4JusMU), press `shift+d` to bring up the reset options menu and then select the 'nuke' option.
+For when you really want to just get rid of anything that shows up when you run `git status` (and yes that includes dirty submodules) [kidpix style](https://www.youtube.com/watch?v=N4E2B_k2Bss), press `shift+d` to bring up the reset options menu and then select the 'nuke' option.
 
 ![Nuke working tree](../assets/demo/nuke_working_tree-compressed.gif)
 
@@ -195,7 +213,7 @@ Say you're on a feature branch that was itself branched off of the develop branc
 
 ### Undo
 
-You can undo the last action by pressing 'z' and redo with `ctrl+z`. Here we drop a couple of commits and then undo the actions.
+You can undo the last action by pressing `z` and redo with `shift+z`. Here we drop a couple of commits and then undo the actions.
 Undo uses the reflog which is specific to commits and branches so we can't undo changes to the working tree or stash.
 
 [More info](/docs/Undoing.md)
@@ -204,7 +222,7 @@ Undo uses the reflog which is specific to commits and branches so we can't undo 
 
 ### Commit graph
 
-When viewing the commit graph in an enlarged window (use `+` and `_` to cycle window sizes), the commit graph is shown. Colours correspond to the commit authors, and as you navigate down the graph, the parent commits of the selected commit are highlighted.
+When viewing the commit graph in an enlarged window (use `+` and `_` to cycle screen modes), the commit graph is shown. Colours correspond to the commit authors, and as you navigate down the graph, the parent commits of the selected commit are highlighted.
 
 ![commit_graph](../assets/demo/commit_graph-compressed.gif)
 
@@ -213,6 +231,10 @@ When viewing the commit graph in an enlarged window (use `+` and `_` to cycle wi
 If you press `shift+w` on a commit (or branch/ref) a menu will open that allows you to mark that commit so that any other commit you select will be diffed against it. Once you've selected the second commit, you'll see the diff in the main view and if you press `<enter>` you'll see the files of the diff. You can press `shift+w` to view the diff menu again to see options like reversing the diff direction or exiting diff mode. You can also exit diff mode by pressing `<escape>`.
 
 ![diff_commits](../assets/demo/diff_commits-compressed.gif)
+
+### Show GitHub pull requests
+
+In the branches panel, lazygit can show which of your branches have an associated GitHub pull request by showing a GitHub icon next to the branch name; its color shows the state of the PR (open, merged, etc.). For those that have one, you can press `shift-G` to open the PR in the browser. There is no configuration needed to enable this for github.com, but it requires the [`gh`](https://cli.github.com/) tool to be installed, and you need to do `gh auth login` once to allow lazygit to access GitHub. For GitHub Enterprise, also run `gh auth login --hostname <webDomain>` and add a [`services` entry](docs/Config.md#custom-pull-request-urls) for the host with the `github` provider.
 
 ## Tutorials
 
@@ -224,7 +246,7 @@ If you press `shift+w` on a commit (or branch/ref) a menu will open that allows 
 
 ## Installation
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/lazygit.svg)](https://repology.org/project/lazygit/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/lazygit.svg?columns=3)](https://repology.org/project/lazygit/versions)
 
 _Most of the above packages are maintained by third parties so be sure to vet them yourself and confirm that the maintainer is a trustworthy looking person who attends local sports games and gives back to their communities with barbeque fundraisers etc_
 
@@ -232,19 +254,15 @@ _Most of the above packages are maintained by third parties so be sure to vet th
 
 For Windows, Mac OS(10.12+) or Linux, you can download a binary release [here](../../releases).
 
+### Dev container feature
+
+If you want to use lazygit in e.g. one of your GitHub Codespaces, there is a third-party [dev container feature](https://github.com/GeorgOfenbeck/features/tree/main/src/lazygit-linuxbinary) based on the binary releases mentioned above.
+
 ### Homebrew
 
-Normally the lazygit formula can be found in the Homebrew core but we suggest you tap our formula to get the frequently updated one. It works with Linux, too.
+It works with Linux, too.
 
-Tap:
-
-```
-brew install jesseduffield/lazygit/lazygit
-```
-
-Core:
-
-```
+```sh
 brew install lazygit
 ```
 
@@ -279,6 +297,14 @@ scoop bucket add extras
 scoop install lazygit
 ```
 
+### gah (Linux and Mac OS)
+
+You can install `lazygit` using [gah](https://github.com/marverix/gah/):
+
+```sh
+gah install lazygit
+```
+
 ### Arch Linux
 
 Packages for Arch Linux are available via pacman and AUR (Arch User Repository).
@@ -292,14 +318,33 @@ and the git version which builds from the most recent commit.
 Instruction of how to install AUR content can be found here:
 <https://wiki.archlinux.org/index.php/Arch_User_Repository>
 
-### Fedora and RHEL
+### Fedora / Amazon Linux 2023 / CentOS Stream
 
-Packages for Fedora/RHEL and CentOS Stream are available via [Copr](https://copr.fedorainfracloud.org/coprs/atim/lazygit/) (Cool Other Package Repo).
+Packages for Fedora, Amazon Linux 2023 and CentOS Stream are available via
+[Copr](https://copr.fedorainfracloud.org/coprs/dejan/lazygit/) (Cool Other Package Repo).
 
 ```sh
-sudo dnf copr enable atim/lazygit -y
+sudo dnf copr enable dejan/lazygit
 sudo dnf install lazygit
 ```
+
+These packages are built using the RPM spec file located here: https://codeberg.org/dejan/rpm-lazygit
+
+You should be able to build RPMs for Fedora 41 or older, and other Fedora derivatives using the
+SRPM (Source RPM) file that you can grab from the latest COPR build.
+
+#### Fedora / RHEL Derivatives (Terra)
+
+Packages for Fedora and RHEL derivatives are also available from the [Terra Repository](https://terra.fyralabs.com/).
+
+```sh
+sudo dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+sudo dnf install lazygit
+```
+
+(Install guide for Atomic/EL can be found on their [README](https://github.com/terrapkg/packages/pull/9747))
+
+Terra also has `lazygit-doc`, which contains the contents of the [docs](https://github.com/jesseduffield/lazygit/tree/master/docs) folder.
 
 ### Solus Linux
 
@@ -307,13 +352,22 @@ sudo dnf install lazygit
 sudo eopkg install lazygit
 ```
 
-### Ubuntu
+### Debian and Ubuntu
+
+For **Debian 13 "Trixie", Sid**, and later, or **Ubuntu 25.10 "Questing Quokka"** and later:
 
 ```sh
-LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+sudo apt install lazygit
+```
+
+For **Debian 12 "Bookworm", Ubuntu 25.04 "Plucky Puffin"** and earlier:
+
+```sh
+LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | \grep -Po '"tag_name": *"v\K[^"]*')
+LAZYGIT_ARCH=$(uname -m | sed -e 's/aarch64/arm64/')
+curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${LAZYGIT_ARCH}.tar.gz"
 tar xf lazygit.tar.gz lazygit
-sudo install lazygit /usr/local/bin
+sudo install lazygit -D -t /usr/local/bin/
 ```
 
 Verify the correct installation of lazygit:
@@ -361,19 +415,64 @@ sudo zypper ar https://download.opensuse.org/repositories/devel:/languages:/go/$
 sudo zypper ref && sudo zypper in lazygit
 ```
 
-### NixOs
+### NixOS
 
-On NixOs lazygit is packaged with nix and distributed via nixpkgs.
-You can try the lazygit without installing it with:
+#### Using lazygit from nixpkgs
+
+On NixOS, lazygit is packaged with nix and distributed via nixpkgs.
+You can try lazygit without installing it with:
 
 ```sh
 nix-shell -p lazygit
 # or with flakes enabled
 nix run nixpkgs#lazygit
 ```
+Or you can add lazygit to your `configuration.nix` using the `environment.systemPackages` option.
+More details can be found via NixOS search [page](https://search.nixos.org/).
 
-Or you can add lazygit to you configuration.nix in the environment.systemPackages section.
-More details can be found via NixOs search [page](https://search.nixos.org/).
+#### Using the official lazygit flake
+
+This repository includes a nix flake that provides the latest development version and additional development tools:
+
+**Run lazygit directly from the repository:**
+```sh
+nix run github:jesseduffield/lazygit
+# or from a local clone
+nix run .
+```
+
+**Build lazygit from source:**
+```sh
+nix build github:jesseduffield/lazygit
+# or from a local clone
+nix build .
+```
+
+**Development environment:**
+For contributors, the flake provides a development shell with Go toolchain, development tools, and dependencies:
+```sh
+nix develop github:jesseduffield/lazygit
+# or from a local clone
+nix develop
+```
+
+The development shell includes:
+- Go toolchain
+- git and make
+- Proper environment variables for development
+
+**Using in other flakes:**
+The flake also provides an overlay for easy integration into other flake-based projects:
+```nix
+{
+  inputs.lazygit.url = "github:jesseduffield/lazygit";
+
+  outputs = { self, nixpkgs, lazygit }: {
+    # Use the overlay
+    nixpkgs.overlays = [ lazygit.overlays.default ];
+  };
+}
+```
 
 ### Flox
 
@@ -413,7 +512,7 @@ go install github.com/jesseduffield/lazygit@latest
 
 Please note:
 If you get an error claiming that lazygit cannot be found or is not defined, you
-may need to add `~/go/bin` to your $PATH (MacOS/Linux), or `%HOME%\go\bin`
+may need to add `~/go/bin` to your $PATH (macOS/Linux), or `%HOME%\go\bin`
 (Windows). Not to be mistaken for `C:\Go\bin` (which is for Go's own binaries,
 not apps like lazygit).
 
@@ -539,3 +638,4 @@ If you find that lazygit doesn't quite satisfy your requirements, these may be a
 
 - [GitUI](https://github.com/Extrawurst/gitui)
 - [tig](https://github.com/jonas/tig)
+- [GitArbor TUI](https://github.com/cadamsdev/gitarbor-tui)

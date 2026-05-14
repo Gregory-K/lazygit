@@ -19,6 +19,7 @@ func (self *ShellCommandAction) Call() error {
 		Title:               self.c.Tr.ShellCommand,
 		FindSuggestionsFunc: self.GetShellCommandsHistorySuggestionsFunc(),
 		AllowEditSuggestion: true,
+		PreserveWhitespace:  true,
 		HandleConfirm: func(command string) error {
 			if self.shouldSaveCommand(command) {
 				self.c.GetAppState().ShellCommandsHistory = utils.Limit(
@@ -31,7 +32,7 @@ func (self *ShellCommandAction) Call() error {
 
 			self.c.LogAction(self.c.Tr.Actions.CustomCommand)
 			return self.c.RunSubprocessAndRefresh(
-				self.c.OS().Cmd.NewInteractiveShell(command),
+				self.c.OS().Cmd.NewShell(command, self.c.UserConfig().OS.ShellFunctionsFile),
 			)
 		},
 		HandleDeleteSuggestion: func(index int) error {

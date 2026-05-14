@@ -1,11 +1,12 @@
 package gui
 
 import (
-	"github.com/jesseduffield/gocui"
-	"github.com/jesseduffield/lazygit/pkg/gui/context"
+	"errors"
+
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
+	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/samber/lo"
-	"golang.org/x/exp/slices"
 )
 
 // layout is called for every screen re-render e.g. when the screen is resized
@@ -23,21 +24,25 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 
 	informationStr := gui.informationStr()
 
-	appStatus := gui.helpers.AppStatus.GetStatusString()
+	var appStatus string
+	appStatusView, err := g.View("appStatus")
+	if err == nil {
+		appStatus = utils.Decolorise(appStatusView.Buffer())
+	}
 
 	viewDimensions := gui.getWindowDimensions(informationStr, appStatus)
 
 	// reading more lines into main view buffers upon resize
 	prevMainView := gui.Views.Main
 	if prevMainView != nil {
-		_, prevMainHeight := prevMainView.Size()
-		newMainHeight := viewDimensions["main"].Y1 - viewDimensions["main"].Y0 - 1
+		prevMainHeight := prevMainView.Height()
+		newMainHeight := viewDimensions["main"].Y1 - viewDimensions["main"].Y0 + 1
 		heightDiff := newMainHeight - prevMainHeight
 		if heightDiff > 0 {
-			if manager, ok := gui.viewBufferManagerMap["main"]; ok {
+			if manager := gui.getViewBufferManagerForView(gui.Views.Main); manager != nil {
 				manager.ReadLines(heightDiff)
 			}
-			if manager, ok := gui.viewBufferManagerMap["secondary"]; ok {
+			if manager := gui.getViewBufferManagerForView(gui.Views.Secondary); manager != nil {
 				manager.ReadLines(heightDiff)
 			}
 		}
@@ -87,17 +92,15 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 			}
 		}
 		if context.NeedsRerenderOnWidthChange() == types.NEEDS_RERENDER_ON_WIDTH_CHANGE_WHEN_WIDTH_CHANGES {
-			// view.Width() returns the width -1 for some reason
-			oldWidth := view.Width() + 1
-			newWidth := dimensionsObj.X1 - dimensionsObj.X0 + 2*frameOffset
+			oldWidth := view.Width()
+			newWidth := dimensionsObj.X1 - dimensionsObj.X0 + 1
 			if oldWidth != newWidth {
 				mustRerender = true
 			}
 		}
 		if context.NeedsRerenderOnHeightChange() {
-			// view.Height() returns the height -1 for some reason
-			oldHeight := view.Height() + 1
-			newHeight := dimensionsObj.Y1 - dimensionsObj.Y0 + 2*frameOffset
+			oldHeight := view.Height()
+			newHeight := dimensionsObj.Y1 - dimensionsObj.Y0 + 1
 			if oldHeight != newHeight {
 				mustRerender = true
 			}
@@ -125,7 +128,7 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 		}
 
 		_, err := setViewFromDimensions(context)
-		if err != nil && !gocui.IsUnknownView(err) {
+		if err != nil && !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 	}
@@ -138,7 +141,7 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 
 	for _, context := range gui.transientContexts() {
 		view, err := gui.g.View(context.GetViewName())
-		if err != nil && !gocui.IsUnknownView(err) {
+		if err != nil && !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		view.Visible = gui.helpers.Window.GetViewNameForWindow(context.GetWindowName()) == context.GetViewName()
@@ -245,25 +248,6 @@ func (gui *Gui) onRepoViewReset() error {
 			return err
 		}
 	}
-
-	gui.g.Mutexes.ViewsMutex.Lock()
-	// add tabs to views
-	for _, view := range gui.g.Views() {
-		// if the view is in our mapping, we'll set the tabs and the tab index
-		for _, values := range gui.viewTabMap() {
-			index := slices.IndexFunc(values, func(tabContext context.TabView) bool {
-				return tabContext.ViewName == view.Name()
-			})
-
-			if index != -1 {
-				view.Tabs = lo.Map(values, func(tabContext context.TabView, _ int) string {
-					return tabContext.Tab
-				})
-				view.TabIndex = index
-			}
-		}
-	}
-	gui.g.Mutexes.ViewsMutex.Unlock()
 
 	return nil
 }

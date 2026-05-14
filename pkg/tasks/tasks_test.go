@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 )
 
@@ -52,7 +52,7 @@ func TestNewCmdTaskInstantStop(t *testing.T) {
 		return cmd, reader
 	}
 
-	fn := manager.NewCmdTask(start, "prefix\n", LinesToRead{20, -1}, onDone)
+	fn := manager.NewCmdTask(start, "prefix\n", LinesToRead{20, -1, nil}, onDone)
 
 	_ = fn(TaskOpts{Stop: stop, InitialContentLoaded: func() { task.Done() }})
 
@@ -115,14 +115,12 @@ func TestNewCmdTask(t *testing.T) {
 		return cmd, reader
 	}
 
-	fn := manager.NewCmdTask(start, "prefix\n", LinesToRead{20, -1}, onDone)
+	fn := manager.NewCmdTask(start, "prefix\n", LinesToRead{20, -1, nil}, onDone)
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		time.Sleep(100 * time.Millisecond)
 		close(stop)
-		wg.Done()
-	}()
+	})
 	_ = fn(TaskOpts{Stop: stop, InitialContentLoaded: func() { task.Done() }})
 
 	wg.Wait()
@@ -167,7 +165,7 @@ func (d *BlankLineReader) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	d.linesYielded += 1
+	d.linesYielded++
 	p[0] = '\n'
 	return 1, nil
 }
@@ -184,37 +182,37 @@ func TestNewCmdTaskRefresh(t *testing.T) {
 		{
 			"total < initialRefreshAfter",
 			150,
-			LinesToRead{100, 120},
+			LinesToRead{100, 120, nil},
 			[]int{100},
 		},
 		{
 			"total == initialRefreshAfter",
 			150,
-			LinesToRead{100, 100},
+			LinesToRead{100, 100, nil},
 			[]int{100},
 		},
 		{
 			"total > initialRefreshAfter",
 			150,
-			LinesToRead{100, 50},
+			LinesToRead{100, 50, nil},
 			[]int{50, 100},
 		},
 		{
 			"initialRefreshAfter == -1",
 			150,
-			LinesToRead{100, -1},
+			LinesToRead{100, -1, nil},
 			[]int{100},
 		},
 		{
 			"totalTaskLines < initialRefreshAfter",
 			25,
-			LinesToRead{100, 50},
+			LinesToRead{100, 50, nil},
 			[]int{25},
 		},
 		{
 			"totalTaskLines between total and initialRefreshAfter",
 			75,
-			LinesToRead{100, 50},
+			LinesToRead{100, 50, nil},
 			[]int{50, 75},
 		},
 	}
@@ -252,12 +250,10 @@ func TestNewCmdTaskRefresh(t *testing.T) {
 
 		fn := manager.NewCmdTask(start, "", s.linesToRead, func() {})
 		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			time.Sleep(100 * time.Millisecond)
 			close(stop)
-			wg.Done()
-		}()
+		})
 		_ = fn(TaskOpts{Stop: stop, InitialContentLoaded: func() { task.Done() }})
 
 		wg.Wait()

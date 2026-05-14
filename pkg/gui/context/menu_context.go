@@ -2,10 +2,12 @@ package context
 
 import (
 	"errors"
+	"strings"
 
-	"github.com/jesseduffield/lazygit/pkg/gui/keybindings"
+	"github.com/jesseduffield/lazygit/pkg/config"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
+	"github.com/jesseduffield/lazygit/pkg/i18n"
 	"github.com/jesseduffield/lazygit/pkg/utils"
 	"github.com/samber/lo"
 )
@@ -48,11 +50,14 @@ func NewMenuContext(
 }
 
 type MenuViewModel struct {
-	c               *ContextCommon
-	menuItems       []*types.MenuItem
-	prompt          string
-	promptLines     []string
-	columnAlignment []utils.Alignment
+	c                         *ContextCommon
+	menuItems                 []*types.MenuItem
+	prompt                    string
+	promptLines               []string
+	columnAlignment           []utils.Alignment
+	allowFilteringKeybindings bool
+	keybindingsTakePrecedence bool
+	onCancel                  func() error
 	*FilteredListViewModel[*types.MenuItem]
 }
 
@@ -62,10 +67,28 @@ func NewMenuViewModel(c *ContextCommon) *MenuViewModel {
 		c:         c,
 	}
 
+	filterKeybindings := false
+
 	self.FilteredListViewModel = NewFilteredListViewModel(
 		func() []*types.MenuItem { return self.menuItems },
-		func(item *types.MenuItem) []string { return item.LabelColumns },
+		func(item *types.MenuItem) []string {
+			if filterKeybindings {
+				return []string{config.LabelForKey(item.Key)}
+			}
+
+			return item.LabelColumns
+		},
 	)
+
+	self.FilteredListViewModel.SetPreprocessFilterFunc(func(filter string) string {
+		if self.allowFilteringKeybindings && strings.HasPrefix(filter, "@") {
+			filterKeybindings = true
+			return filter[1:]
+		}
+
+		filterKeybindings = false
+		return filter
+	})
 
 	return self
 }
@@ -73,6 +96,10 @@ func NewMenuViewModel(c *ContextCommon) *MenuViewModel {
 func (self *MenuViewModel) SetMenuItems(items []*types.MenuItem, columnAlignment []utils.Alignment) {
 	self.menuItems = items
 	self.columnAlignment = columnAlignment
+}
+
+func (self *MenuViewModel) SetOnCancel(onCancel func() error) {
+	self.onCancel = onCancel
 }
 
 func (self *MenuViewModel) GetPrompt() string {
@@ -92,6 +119,14 @@ func (self *MenuViewModel) SetPromptLines(promptLines []string) {
 	self.promptLines = promptLines
 }
 
+func (self *MenuViewModel) SetAllowFilteringKeybindings(allow bool) {
+	self.allowFilteringKeybindings = allow
+}
+
+func (self *MenuViewModel) SetKeybindingsTakePrecedence(value bool) {
+	self.keybindingsTakePrecedence = value
+}
+
 // TODO: move into presentation package
 func (self *MenuViewModel) GetDisplayStrings(_ int, _ int) [][]string {
 	menuItems := self.FilteredListViewModel.GetItems()
@@ -103,8 +138,8 @@ func (self *MenuViewModel) GetDisplayStrings(_ int, _ int) [][]string {
 		}
 
 		keyLabel := ""
-		if item.Key != nil {
-			keyLabel = style.FgCyan.Sprint(keybindings.LabelFromKey(item.Key))
+		if item.Key.IsSet() {
+			keyLabel = style.FgCyan.Sprint(config.LabelForKey(item.Key))
 		}
 
 		checkMark := ""
@@ -144,7 +179,7 @@ func (self *MenuViewModel) GetNonModelItems() []*NonModelItem {
 	}
 
 	menuItems := self.FilteredListViewModel.GetItems()
-	var prevSection *types.MenuSection = nil
+	var prevSection *types.MenuSection
 	for i, menuItem := range menuItems {
 		if menuItem.Section != nil && menuItem.Section != prevSection {
 			if prevSection != nil {
@@ -170,7 +205,7 @@ func (self *MenuViewModel) GetNonModelItems() []*NonModelItem {
 func (self *MenuContext) GetKeybindings(opts types.KeybindingsOpts) []*types.Binding {
 	basicBindings := self.ListContextTrait.GetKeybindings(opts)
 	menuItemsWithKeys := lo.Filter(self.menuItems, func(item *types.MenuItem, _ int) bool {
-		return item.Key != nil
+		return item.Key.IsSet()
 	})
 
 	menuItemBindings := lo.Map(menuItemsWithKeys, func(item *types.MenuItem, _ int) *types.Binding {
@@ -180,10 +215,19 @@ func (self *MenuContext) GetKeybindings(opts types.KeybindingsOpts) []*types.Bin
 		}
 	})
 
-	// appending because that means the menu item bindings have lower precedence.
-	// So if a basic binding is to escape from the menu, we want that to still be
-	// what happens when you press escape. This matters when we're showing the menu
-	// for all keybindings of say the files context.
+	if self.keybindingsTakePrecedence {
+		// This is used for all normal menus except the keybindings menu. In this case we want the
+		// bindings of the menu items to have higher precedence than the builtin bindings; this
+		// allows assigning a keybinding to a menu item that overrides a non-essential binding such
+		// as 'j', 'k', 'H', 'L', etc. This is safe to do because the essential bindings such as
+		// confirm and return have already been removed from the menu items in this case.
+		return append(menuItemBindings, basicBindings...)
+	}
+
+	// For the keybindings menu we didn't remove the essential bindings from the menu items, because
+	// it is important to see all bindings (as a cheat sheet for what the keys are when the menu is
+	// not open). Therefore we want the essential bindings to have higher precedence than the menu
+	// item bindings.
 	return append(basicBindings, menuItemBindings...)
 }
 
@@ -200,6 +244,9 @@ func (self *MenuContext) OnMenuPress(selectedItem *types.MenuItem) error {
 	self.c.Context().Pop()
 
 	if selectedItem == nil {
+		if self.onCancel != nil {
+			return self.onCancel()
+		}
 		return nil
 	}
 
@@ -213,4 +260,12 @@ func (self *MenuContext) OnMenuPress(selectedItem *types.MenuItem) error {
 // There is currently no need to use range-select in a menu so we're disabling it.
 func (self *MenuContext) RangeSelectEnabled() bool {
 	return false
+}
+
+func (self *MenuContext) FilterPrefix(tr *i18n.TranslationSet) string {
+	if self.allowFilteringKeybindings {
+		return tr.FilterPrefixMenu
+	}
+
+	return self.FilteredListViewModel.FilterPrefix(tr)
 }

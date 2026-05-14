@@ -3,7 +3,7 @@ package controllers
 import (
 	"os"
 
-	"github.com/jesseduffield/gocui"
+	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/mergeconflicts"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
@@ -112,10 +112,11 @@ func (self *MergeConflictsController) GetKeybindings(opts types.KeybindingsOpts)
 			Tag:         "navigation",
 		},
 		{
-			Key:             opts.GetKey(opts.Config.Files.OpenMergeTool),
-			Handler:         self.c.Helpers().WorkingTree.OpenMergeTool,
-			Description:     self.c.Tr.OpenMergeTool,
-			Tooltip:         self.c.Tr.OpenMergeToolTooltip,
+			Key:             opts.GetKey(opts.Config.Files.OpenMergeOptions),
+			Handler:         self.openMergeConflictMenu,
+			Description:     self.c.Tr.ViewMergeConflictOptions,
+			Tooltip:         self.c.Tr.ViewMergeConflictOptionsTooltip,
+			OpensMenu:       true,
 			DisplayOnScreen: true,
 		},
 		{
@@ -277,7 +278,7 @@ func (self *MergeConflictsController) pickSelection(selection mergeconflicts.Sel
 	}
 
 	if self.context().GetState().AllConflictsResolved() {
-		return self.onLastConflictResolved()
+		self.onLastConflictResolved()
 	}
 
 	return nil
@@ -314,10 +315,15 @@ func (self *MergeConflictsController) resolveConflict(selection mergeconflicts.S
 	return true, os.WriteFile(state.GetPath(), []byte(content), 0o644)
 }
 
-func (self *MergeConflictsController) onLastConflictResolved() error {
+func (self *MergeConflictsController) onLastConflictResolved() {
 	// as part of refreshing files, we handle the situation where a file has had
 	// its merge conflicts resolved.
-	return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, Scope: []types.RefreshableView{types.FILES}})
+	self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, Scope: []types.RefreshableView{types.FILES}})
+}
+
+func (self *MergeConflictsController) openMergeConflictMenu() error {
+	filepath := self.context().GetState().GetPath()
+	return self.c.Helpers().WorkingTree.CreateMergeConflictMenu([]string{filepath})
 }
 
 func (self *MergeConflictsController) withRenderAndFocus(f func() error) func() error {
